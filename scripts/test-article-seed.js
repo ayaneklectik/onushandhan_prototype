@@ -148,7 +148,6 @@ export async function removeTestArticles() {
       await db.query("DELETE FROM media_assets WHERE id=$1", [asset.media_asset_id]);
       deletedAssets += 1;
     }
-    await db.query("DELETE FROM test_seed_assets");
     await db.query("COMMIT");
   } catch (error) {
     await db.query("ROLLBACK");
