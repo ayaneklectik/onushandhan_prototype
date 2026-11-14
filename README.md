@@ -126,3 +126,20 @@ npm run check
 ```
 
 The repository does not include production credentials or a database/object-storage service. Run migrations and perform end-to-end account/content checks against the PostgreSQL and bucket configured for your deployment before opening the panel to staff.
+
+## Test article content
+
+To populate every enabled article category with 10 clearly labelled demo articles and eight reusable sample illustrations uploaded to the configured S3-compatible bucket (Cloudflare R2 in production), run:
+
+```sh
+npm run db:migrate
+npm run seed:test-articles
+```
+
+The video-only category is excluded. The seed is tracked in dedicated database tables and refuses to create a second batch while a tracked batch exists. To remove only seeded demo articles and their unreferenced demo images, run:
+
+```sh
+npm run seed:remove-test-articles
+```
+
+Images still referenced by other articles or videos are preserved. Back up the database and bucket before cleanup. Demo articles are published for frontend testing and are visibly labelled as test content; do not leave them on a public production site.
