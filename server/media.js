@@ -4,7 +4,8 @@ import {
   HeadObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
-import { createPresignedPost } from "@aws-sdk/s3-presigned-post";
+import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { config } from "./config.js";
 import { pool, recordActivity } from "./db.js";
 
@@ -70,16 +71,15 @@ export async function createUpload(req, res) {
 
   const key = `uploads/${req.user.id}/${randomUUID()}${EXTENSIONS[contentType]}`;
   const publicUrl = mediaUrl(key);
-  const upload = await createPresignedPost(s3, {
-    Bucket: mediaConfig.bucket,
-    Key: key,
-    Conditions: [
-      ["content-length-range", 1, maxBytes + 65_536],
-      ["eq", "$Content-Type", contentType],
-    ],
-    Fields: { "Content-Type": contentType },
-    Expires: 600,
-  });
+  const uploadUrl = await getSignedUrl(
+    s3,
+    new PutObjectCommand({
+      Bucket: mediaConfig.bucket,
+      Key: key,
+      ContentType: contentType,
+    }),
+    { expiresIn: 600 },
+  );
   const asset = await pool.query(
     `INSERT INTO media_assets (object_key, media_type, content_type, size_bytes, uploader_id)
      VALUES ($1, $2, $3, $4, $5) RETURNING id`,
@@ -88,8 +88,9 @@ export async function createUpload(req, res) {
   return res.status(201).json({
     assetId: asset.rows[0].id,
     objectKey: key,
-    uploadUrl: upload.url,
-    fields: upload.fields,
+    uploadUrl,
+    uploadMethod: "PUT",
+    contentType,
     publicUrl,
   });
 }

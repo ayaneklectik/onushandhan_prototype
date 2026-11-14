@@ -330,10 +330,11 @@
       method: "POST",
       body: JSON.stringify({ mediaType, contentType: file.type, sizeBytes: file.size }),
     });
-    const formData = new FormData();
-    Object.entries(upload.fields).forEach(([name, value]) => formData.append(name, value));
-    formData.append("file", file);
-    const response = await fetch(upload.uploadUrl, { method: "POST", body: formData });
+    const response = await fetch(upload.uploadUrl, {
+      method: upload.uploadMethod || "PUT",
+      headers: { "Content-Type": upload.contentType || file.type },
+      body: file,
+    });
     if (!response.ok) throw new Error(`Upload failed (${response.status}). Check the media bucket CORS configuration.`);
     statusElement.textContent = "Verifying upload…";
     const completed = await request(`/api/admin/media/uploads/${upload.assetId}/complete`, { method: "POST" });
