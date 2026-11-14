@@ -95,7 +95,29 @@ git commit -m "Describe frontend change"
 git push -u origin frontend
 ```
 
-Replace `frontend` with `backend` or `database` and stage the corresponding files from the table. For later work on an existing branch, use `git switch <branch>` instead of `git switch -c <branch>`, then pull and push that branch. Keep `.env` local; commit `.env.example` only when changing the documented configuration template. Open a pull request from the work branch into `main` when the change is ready.
+For backend work, create the branch from `main` and stage the server and operational scripts:
+
+```sh
+git switch main
+git pull origin main
+git switch -c backend
+git add server/ scripts/
+git commit -m "Describe backend change"
+git push -u origin backend
+```
+
+For database work, stage migrations and database-specific connection changes:
+
+```sh
+git switch main
+git pull origin main
+git switch -c database
+git add migrations/ server/db.js
+git commit -m "Describe database change"
+git push -u origin database
+```
+
+For later work on an existing branch, use `git switch <branch>` instead of `git switch -c <branch>`, then pull and push that branch. Keep `.env` local; commit `.env.example` only when changing the documented configuration template. Open a pull request from the work branch into `main` when the change is ready.
 
 ## Checks
 
