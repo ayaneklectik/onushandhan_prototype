@@ -75,6 +75,34 @@ app.use(["/api/admin", "/api/auth", "/api/csrf"], (_req, res, next) => {
   return next();
 });
 
+app.use(async (req, res, next) => {
+  const adminPath = req.path === "/admin" || req.path === "/admin.html" ||
+    req.path.startsWith("/api/admin/") || req.path === "/api/admin" ||
+    req.path.startsWith("/api/auth/") || req.path === "/api/csrf" ||
+    req.path === "/healthz" || req.path === "/admin.css" || req.path === "/admin.js" ||
+    req.path === "/onusondhan-logo.png";
+  if (adminPath) return next();
+  try {
+    const result = await pool.query(
+      "SELECT setting_value FROM site_settings WHERE setting_key = 'maintenance_mode' LIMIT 1",
+    );
+    if (result.rows[0]?.setting_value !== "true") return next();
+    res.set({
+      "Cache-Control": "no-store, no-cache, must-revalidate",
+      "X-Robots-Tag": "noindex, nofollow, noarchive",
+      "Retry-After": "1800",
+    });
+    if (req.path.startsWith("/api/")) {
+      return res.status(503).json({ error: "The website is temporarily under maintenance.", maintenance: true });
+    }
+    return res.status(503).sendFile(path.join(root, "maintenance.html"), (error) => {
+      if (error && !res.headersSent) res.status(503).type("text").send("অনুসন্ধান — রক্ষণাবেক্ষণ চলছে।");
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 app.get("/healthz", async (_req, res, next) => {
   try {
     await pool.query("SELECT 1");
