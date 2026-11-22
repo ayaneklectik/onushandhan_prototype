@@ -817,7 +817,6 @@
           method: "PATCH",
           body: JSON.stringify({
             ...Object.fromEntries(new FormData(form)),
-            maintenance_mode: form.elements.maintenance_mode.checked ? "true" : "false",
           }),
         });
         showToast("Site settings saved.");
