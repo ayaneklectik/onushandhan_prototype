@@ -59,7 +59,7 @@ async function uniqueArticleSlug(client, title) {
 async function articleRecord(client, id) {
   const result = await client.query(
     `SELECT a.id, a.slug, a.title, a.headline, a.summary, a.body, a.image_key,
-            a.image_alt, a.category_id, a.status, a.author_id, a.published_at,
+            a.image_alt, a.attribution, a.image_caption, a.image_credit, a.category_id, a.status, a.author_id, a.published_at,
             a.created_at, a.updated_at, u.username AS author,
             c.name AS category, c.slug AS category_slug, c.parent_id AS category_parent_id
      FROM articles a
@@ -220,7 +220,7 @@ api.get("/public/site", async (_req, res) => {
 api.get("/public/articles/:slug", async (req, res) => {
   const result = await pool.query(
     `SELECT a.id, a.slug, a.title, a.headline, a.summary, a.body, a.image_key,
-            a.image_alt, a.published_at, u.username AS author,
+            a.image_alt, a.attribution, a.image_caption, a.image_credit, a.published_at, u.username AS author,
             c.name AS category, c.slug AS category_slug
      FROM articles a JOIN users u ON u.id = a.author_id
      LEFT JOIN categories c ON c.id = a.category_id
@@ -371,6 +371,9 @@ const articleInput = z.object({
   body: text(100000).optional(),
   imageKey: text(500).nullable().optional(),
   imageAlt: text(300).optional(),
+  attribution: text(300).optional(),
+  imageCaption: text(500).optional(),
+  imageCredit: text(300).optional(),
   categoryId: uuid.nullable().optional(),
 });
 
@@ -385,8 +388,8 @@ api.post("/admin/articles", requireRoles(...EDITORS), async (req, res) => {
     const slug = await uniqueArticleSlug(client, input.title);
     const created = await client.query(
       `INSERT INTO articles
-       (slug, title, headline, summary, body, image_key, image_alt, category_id, author_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id`,
+       (slug, title, headline, summary, body, image_key, image_alt, attribution, image_caption, image_credit, category_id, author_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING id`,
       [
         slug,
         input.title,
@@ -395,6 +398,9 @@ api.post("/admin/articles", requireRoles(...EDITORS), async (req, res) => {
         input.body ?? "",
         input.imageKey ?? null,
         input.imageAlt ?? "",
+        input.attribution ?? "",
+        input.imageCaption ?? "",
+        input.imageCredit ?? "",
         input.categoryId ?? null,
         req.user.id,
       ],
@@ -452,6 +458,9 @@ api.patch("/admin/articles/:id", requireRoles(...EDITORS), async (req, res) => {
       body: "body",
       imageKey: "image_key",
       imageAlt: "image_alt",
+      attribution: "attribution",
+      imageCaption: "image_caption",
+      imageCredit: "image_credit",
       categoryId: "category_id",
       slug: "slug",
     };
