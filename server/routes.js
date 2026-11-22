@@ -1173,7 +1173,7 @@ api.post("/admin/content/:module", requireRoles(SUPER), async (req, res) => {
   if (!contentModules.has(module)) return res.status(404).json({ error: "Content module not found." });
   const input = parse(z.object({
     title: text(180).min(1), content: text(20000).optional(),
-    targetUrl: text(1000).optional(), imageUrl: text(1000).optional(),
+    targetUrl: z.union([z.literal(""), z.string().url().max(1000).refine(v => v.startsWith("https://"))]).optional(), imageUrl: z.union([z.literal(""), z.string().url().max(1000).refine(v => v.startsWith("https://"))]).optional(),
     placement: text(80).optional(), isEnabled: z.boolean().optional(),
     sortOrder: z.number().int().min(0).max(10000).optional(),
   }), req.body, res);
