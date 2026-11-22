@@ -1139,3 +1139,124 @@ api.get("/admin/users/:id/activity", requireRoles(...MANAGERS), async (req, res)
   );
   return res.json({ activity: result.rows });
 });
+
+
+// Editorial collections and newsroom content modules.
+const contentModules = new Set(["writings", "ads"]);
+api.get("/admin/content/:module", requireRoles(SUPER), async (req, res) => {
+  const module = req.params.module;
+  if (!contentModules.has(module)) return res.status(404).json({ error: "Content module not found." });
+  const result = await pool.query(
+    "SELECT * FROM admin_content_entries WHERE module = $1 ORDER BY sort_order, created_at DESC",
+    [module],
+  );
+  return res.json({ entries: result.rows });
+});
+api.post("/admin/content/:module", requireRoles(SUPER), async (req, res) => {
+  const module = req.params.module;
+  if (!contentModules.has(module)) return res.status(404).json({ error: "Content module not found." });
+  const input = parse(z.object({
+    title: text(180).min(1), content: text(20000).optional(),
+    targetUrl: text(1000).optional(), imageUrl: text(1000).optional(),
+    placement: text(80).optional(), isEnabled: z.boolean().optional(),
+    sortOrder: z.number().int().min(0).max(10000).optional(),
+  }), req.body, res);
+  if (!input) return;
+  const result = await pool.query(
+    `INSERT INTO admin_content_entries
+     (module, title, content, target_url, image_url, placement, is_enabled, sort_order, created_by)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+    [module,input.title,input.content||"",input.targetUrl||"",input.imageUrl||"",input.placement||"",input.isEnabled??true,input.sortOrder??0,req.user.id],
+  );
+  await recordActivity(pool, req.user.id, "created", module, result.rows[0].id);
+  return res.status(201).json({ entry: result.rows[0] });
+});
+api.patch("/admin/content/:module/:id", requireRoles(SUPER), async (req, res) => {
+  const module = req.params.module;
+  if (!contentModules.has(module)) return res.status(404).json({ error: "Content module not found." });
+  const input = parse(z.object({
+    title: text(180).min(1).optional(), content: text(20000).optional(),
+    targetUrl: text(1000).optional(), imageUrl: text(1000).optional(),
+    placement: text(80).optional(), isEnabled: z.boolean().optional(),
+    sortOrder: z.number().int().min(0).max(10000).optional(),
+  }).strict(), req.body, res);
+  if (!input) return;
+  const columns={title:"title",content:"content",targetUrl:"target_url",imageUrl:"image_url",placement:"placement",isEnabled:"is_enabled",sortOrder:"sort_order"};
+  const updates=Object.entries(columns).filter(([key])=>input[key]!==undefined);
+  if(!updates.length) return res.status(400).json({error:"No changes provided."});
+  const values=updates.map(([key])=>input[key]); values.push(module,req.params.id);
+  const result=await pool.query(
+    `UPDATE admin_content_entries SET ${updates.map(([,col],i)=>col+" = $"+(i+1)).join(", ")}, updated_at=now()
+     WHERE module = $${values.length-1} AND id = $${values.length} RETURNING *`,values);
+  if(!result.rowCount) return res.status(404).json({error:"Entry not found."});
+  await recordActivity(pool,req.user.id,"updated",module,req.params.id);
+  return res.json({entry:result.rows[0]});
+});
+api.delete("/admin/content/:module/:id", requireRoles(SUPER), async (req,res)=>{
+  if(!contentModules.has(req.params.module)) return res.status(404).json({error:"Content module not found."});
+  const result=await pool.query("DELETE FROM admin_content_entries WHERE module=$1 AND id=$2 RETURNING id",[req.params.module,req.params.id]);
+  if(!result.rowCount) return res.status(404).json({error:"Entry not found."});
+  await recordActivity(pool,req.user.id,"deleted",req.params.module,req.params.id);
+  return res.json({ok:true});
+});
+
+const placements = new Set(["recent","breaking","popular","special"]);
+api.get("/admin/placements/:placement", requireRoles(SUPER), async (req,res)=>{
+  if(!placements.has(req.params.placement)) return res.status(404).json({error:"Placement not found."});
+  const result=await pool.query(
+    `SELECT a.id,a.title,a.headline,a.slug,a.status,p.sort_order
+     FROM article_placements p JOIN articles a ON a.id=p.article_id
+     WHERE p.placement=$1 ORDER BY p.sort_order,a.published_at DESC`,[req.params.placement]);
+  return res.json({articles:result.rows});
+});
+api.put("/admin/placements/:placement", requireRoles(SUPER), async (req,res)=>{
+  const placement=req.params.placement;
+  if(!placements.has(placement)) return res.status(404).json({error:"Placement not found."});
+  const input=parse(z.object({articleIds:z.array(uuid).max(100)}),req.body,res);
+  if(!input) return;
+  const client=await pool.connect();
+  try{
+    await client.query("BEGIN");
+    const valid=await client.query("SELECT id FROM articles WHERE id=ANY($1::uuid[]) AND status='published'",[input.articleIds]);
+    if(valid.rowCount!==new Set(input.articleIds).size){
+      await client.query("ROLLBACK"); return res.status(400).json({error:"Only published articles can be featured."});
+    }
+    await client.query("DELETE FROM article_placements WHERE placement=$1",[placement]);
+    for(const [index,id] of input.articleIds.entries()){
+      await client.query("INSERT INTO article_placements(article_id,placement,sort_order) VALUES($1,$2,$3)",[id,placement,index]);
+    }
+    await recordActivity(client,req.user.id,"updated","placement",placement);
+    await client.query("COMMIT");
+    return res.json({ok:true});
+  }catch(error){await client.query("ROLLBACK");throw error;}finally{client.release();}
+});
+
+api.get("/admin/profile", requireAuth, async (req,res)=>{
+  const result=await pool.query("SELECT id,username,email,role FROM users WHERE id=$1",[req.user.id]);
+  return res.json({profile:result.rows[0]});
+});
+api.patch("/admin/profile", requireAuth, async (req,res)=>{
+  const input=parse(z.object({
+    username:z.string().trim().min(3).max(48).regex(/^[a-zA-Z0-9._-]+$/).optional(),
+    email:z.string().trim().email().max(254).optional(),
+    currentPassword:z.string().min(1).max(72).optional(),
+    newPassword:z.string().min(12).max(72).refine(v=>Buffer.byteLength(v,"utf8")<=72).optional(),
+  }).strict().refine(v=>(v.newPassword===undefined)===(v.currentPassword===undefined),{message:"Current and new password must be provided together."}),req.body,res);
+  if(!input) return;
+  const current=await pool.query("SELECT password_hash FROM users WHERE id=$1",[req.user.id]);
+  if(input.newPassword && !(await bcrypt.compare(input.currentPassword,current.rows[0].password_hash))){
+    return res.status(400).json({error:"Current password is incorrect."});
+  }
+  const updates=[],values=[];
+  if(input.username!==undefined){values.push(input.username);updates.push("username=$"+values.length);}
+  if(input.email!==undefined){values.push(input.email.toLowerCase());updates.push("email=$"+values.length);}
+  if(input.newPassword){values.push(await bcrypt.hash(input.newPassword,12));updates.push("password_hash=$"+values.length);}
+  if(!updates.length) return res.status(400).json({error:"No profile changes provided."});
+  values.push(req.user.id);
+  try{
+    await pool.query(`UPDATE users SET ${updates.join(", ")},updated_at=now() WHERE id=$${values.length}`,values);
+    if(input.newPassword) await pool.query("DELETE FROM admin_sessions WHERE user_id=$1 AND id <> $2",[req.user.id,req.session.id]);
+    await recordActivity(pool,req.user.id,"updated","profile",req.user.id);
+    return res.json({ok:true});
+  }catch(error){if(error.code==="23505")return res.status(409).json({error:"Username or email already in use."});throw error;}
+});
