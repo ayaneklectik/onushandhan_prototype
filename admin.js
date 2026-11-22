@@ -366,8 +366,26 @@
             <span id="article-upload-status" class="form-help"></span>
           </label>
           <label>Image description <input name="imageAlt" maxlength="300" value="${escapeHtml(article?.image_alt || "")}"></label>
+          <label class="full-width">Photo caption / ছবির ক্যাপশন <input name="imageCaption" maxlength="500" value="${escapeHtml(article?.image_caption || "")}"></label>
+          <label>Photo credit / ছবির সূত্র <input name="imageCredit" maxlength="300" value="${escapeHtml(article?.image_credit || "")}" placeholder="ছবি: নিজস্ব প্রতিবেদক"></label>
+          <label>Attribution / প্রতিবেদনের সূত্র <input name="attribution" maxlength="300" value="${escapeHtml(article?.attribution || "")}" placeholder="২৪ঘণ্টা অনলাইন"></label>
           <input type="hidden" name="imageKey" value="${escapeHtml(article?.image_key || "")}">
-          <label class="full-width">Article body <textarea name="body" maxlength="100000" rows="12">${escapeHtml(article?.body || "")}</textarea></label>
+          <label class="full-width">Article body / প্রতিবেদনের মূল লেখা
+            <div class="editor-toolbar" role="toolbar" aria-label="Text formatting">
+              <button type="button" data-format="bold"><strong>B</strong></button>
+              <button type="button" data-format="italic"><em>I</em></button>
+              <button type="button" data-format="underline"><u>U</u></button>
+              <button type="button" data-format="h2">শিরোনাম</button>
+              <button type="button" data-format="p">অনুচ্ছেদ</button>
+              <button type="button" data-format="blockquote">উদ্ধৃতি</button>
+              <button type="button" data-format="ul">• তালিকা</button>
+              <button type="button" data-format="ol">১. তালিকা</button>
+              <button type="button" data-format="link">লিংক</button>
+              <button type="button" data-format="remove">ফরম্যাট মুছুন</button>
+            </div>
+            <div id="article-body-editor" class="article-rich-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="এখানে প্রতিবেদন লিখুন…">${article?.body || ""}</div>
+            <textarea name="body" hidden maxlength="100000">${escapeHtml(article?.body || "")}</textarea>
+          </label>
         </div>
         <div class="form-actions">
           <button type="button" class="button button-secondary" data-action="close-modal">Cancel</button>
@@ -377,6 +395,34 @@
       </form>
     `);
     const form = document.querySelector("#article-editor");
+    const richEditor = form.querySelector("#article-body-editor");
+    const bodyField = form.elements.body;
+    form.querySelectorAll("[data-format]").forEach((button) => {
+      button.addEventListener("mousedown", (event) => event.preventDefault());
+      button.addEventListener("click", () => {
+        richEditor.focus();
+        const format = button.dataset.format;
+        if (format === "link") {
+          const url = window.prompt("HTTPS link URL:");
+          if (!url || !/^https:\/\//i.test(url)) return;
+          document.execCommand("createLink", false, url);
+        } else if (format === "remove") {
+          document.execCommand("removeFormat");
+        } else if (format === "h2") {
+          document.execCommand("formatBlock", false, "h2");
+        } else if (format === "p") {
+          document.execCommand("formatBlock", false, "p");
+        } else if (format === "blockquote") {
+          document.execCommand("formatBlock", false, "blockquote");
+        } else if (format === "ul") {
+          document.execCommand("insertUnorderedList");
+        } else if (format === "ol") {
+          document.execCommand("insertOrderedList");
+        } else {
+          document.execCommand(format);
+        }
+      });
+    });
     const file = document.querySelector("#article-image-file");
     file.addEventListener("change", async () => {
       const status = document.querySelector("#article-upload-status");
@@ -393,12 +439,16 @@
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       const submitAction = event.submitter?.dataset.submitAction || "save";
+      bodyField.value = richEditor.innerHTML;
       const formData = new FormData(form);
       const data = {
         title: formData.get("title"),
         headline: formData.get("headline"),
         summary: formData.get("summary"),
-        body: formData.get("body"),
+        body: form.querySelector("#article-body-editor").innerHTML,
+        attribution: formData.get("attribution"),
+        imageCaption: formData.get("imageCaption"),
+        imageCredit: formData.get("imageCredit"),
         categoryId: formData.get("categoryId") || null,
         imageKey: formData.get("imageKey") || null,
         imageAlt: formData.get("imageAlt"),
