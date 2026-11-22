@@ -429,6 +429,16 @@
     }
 
     const categories = [{ slug: "latest", name: "সর্বশেষ সংবাদ", id: null }, ...data.categories];
+    const headerAnnouncement = document.querySelector("#header-announcement");
+    if (headerAnnouncement) {
+      headerAnnouncement.textContent = data.settings?.header_text || "";
+      headerAnnouncement.hidden = !data.settings?.header_text;
+    }
+    const footerNote = document.querySelector("#footer-note");
+    if (footerNote) {
+      footerNote.textContent = data.settings?.footer_text || "";
+      footerNote.hidden = !data.settings?.footer_text;
+    }
     if (data.settings?.contact_email) {
       const email = document.querySelector("#contact-email");
       email.href = `mailto:${data.settings.contact_email}`;
