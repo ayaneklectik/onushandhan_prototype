@@ -786,10 +786,10 @@
     `;
   }
 
-  async function renderSettings() {
+  async function renderSettings(section = "settings") {
     const { settings } = await request("/api/admin/settings");
     pageContent.innerHTML = `
-      ${setHeading("Site settings", "Update the contact details and social links shown on the public website.")}
+      ${setHeading(section === "header" ? "Header" : section === "footer" ? "Footer" : section === "social" ? "Social" : "Site settings", "Manage public website presentation and availability.")}
       <form id="site-settings-form" class="panel section-card stack-form">
         <div class="form-grid">
           <label>Site name <input name="site_name" maxlength="100" required value="${escapeHtml(settings.site_name || "")}"></label>
@@ -797,6 +797,9 @@
           <label>Facebook URL <input name="facebook_url" type="url" placeholder="https://facebook.com/…" value="${escapeHtml(settings.facebook_url || "")}"></label>
           <label>YouTube URL <input name="youtube_url" type="url" placeholder="https://youtube.com/…" value="${escapeHtml(settings.youtube_url || "")}"></label>
           <label>Instagram URL <input name="instagram_url" type="url" placeholder="https://instagram.com/…" value="${escapeHtml(settings.instagram_url || "")}"></label>
+          <label class="full-width">Header announcement <input name="header_text" maxlength="240" value="${escapeHtml(settings.header_text || "")}"></label>
+          <label class="full-width">Footer note <input name="footer_text" maxlength="500" value="${escapeHtml(settings.footer_text || "")}"></label>
+          <label class="inline-toggle full-width"><input name="maintenance_mode" type="checkbox" ${settings.maintenance_mode === "true" ? "checked" : ""}><span class="toggle-track"></span> Undermaintaince — show maintenance page to all public visitors</label>
         </div>
         <p class="form-help">Social links are optional. Leave a field blank to hide its icon from the public site.</p>
         <div class="form-actions"><button type="submit" class="button button-primary">Save settings</button></div>
@@ -808,7 +811,10 @@
       try {
         await request("/api/admin/settings", {
           method: "PATCH",
-          body: JSON.stringify(Object.fromEntries(new FormData(form))),
+          body: JSON.stringify({
+            ...Object.fromEntries(new FormData(form)),
+            maintenance_mode: form.elements.maintenance_mode.checked ? "true" : "false",
+          }),
         });
         showToast("Site settings saved.");
       } catch (error) {
@@ -996,6 +1002,13 @@
           });
           showToast("Category orders saved.");
           await renderCategories();
+        }
+        if (action === "new-content") await openContentEditor(state.view);
+        if (action === "edit-content") await openContentEditor(state.view,id);
+        if (action === "delete-content") {
+          if(!window.confirm("Delete this entry permanently?")) return;
+          await request(`/api/admin/content/${state.view}/${id}`,{method:"DELETE"});
+          showToast("Entry deleted."); await renderContentModule(state.view);
         }
         if (action === "new-article") await openArticleEditor();
         if (action === "edit-article") await openArticleEditor(id);
