@@ -207,7 +207,7 @@ api.get("/public/site", async (_req, res) => {
   return res.json({
     categories: categoriesResult.rows,
     articles,
-    placements: Object.groupBy(placementsResult.rows.map(article => ({ ...article, image: mediaUrl(article.image_key) })), article => article.placement),
+    placements: placementsResult.rows.reduce((groups, article) => { const item = { ...article, image: mediaUrl(article.image_key) }; (groups[item.placement] ||= []).push(item); return groups; }, {}),
     sections,
     videos: videosResult.rows.map((video) => {
       const videoId = video.external_url ? youtubeVideoId(video.external_url) : null;
