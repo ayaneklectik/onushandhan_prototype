@@ -1,5 +1,3 @@
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import express from "express";
 import helmet from "helmet";
 import { rateLimit } from "express-rate-limit";
@@ -17,7 +15,6 @@ import {
 import { api } from "./routes.js";
 import { completeUpload, createUpload, deleteMedia } from "./media.js";
 
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const app = express();
 const s3Origin = config.media.endpoint
   ? new URL(config.media.endpoint).origin
@@ -75,13 +72,15 @@ app.use(["/api/admin", "/api/auth", "/api/csrf"], (_req, res, next) => {
   return next();
 });
 
+// The frontend is served by its own Nginx service. This API-only process
+// retains the existing same-origin /api contract through the frontend proxy.
 app.use(async (req, res, next) => {
-  const adminPath = req.path === "/admin" || req.path === "/admin.html" ||
-    req.path.startsWith("/api/admin/") || req.path === "/api/admin" ||
-    req.path.startsWith("/api/auth/") || req.path === "/api/csrf" ||
-    req.path === "/healthz" || req.path === "/admin.css" || req.path === "/admin.js" ||
-    req.path === "/onusondhan-logo.png";
-  if (adminPath) return next();
+  const isPublicApi = req.path.startsWith("/api/") &&
+    !req.path.startsWith("/api/admin/") &&
+    req.path !== "/api/admin" &&
+    !req.path.startsWith("/api/auth/") &&
+    req.path !== "/api/csrf";
+  if (!isPublicApi) return next();
   try {
     const result = await pool.query(
       "SELECT setting_value FROM site_settings WHERE setting_key = 'maintenance_mode' LIMIT 1",
@@ -92,12 +91,7 @@ app.use(async (req, res, next) => {
       "X-Robots-Tag": "noindex, nofollow, noarchive",
       "Retry-After": "1800",
     });
-    if (req.path.startsWith("/api/")) {
-      return res.status(503).json({ error: "The website is temporarily under maintenance.", maintenance: true });
-    }
-    return res.status(503).sendFile(path.join(root, "maintenance.html"), (error) => {
-      if (error && !res.headersSent) res.status(503).type("text").send("অনুসন্ধান — রক্ষণাবেক্ষণ চলছে।");
-    });
+    return res.status(503).json({ error: "The website is temporarily under maintenance.", maintenance: true });
   } catch (error) {
     return next(error);
   }
@@ -106,7 +100,7 @@ app.use(async (req, res, next) => {
 app.get("/healthz", async (_req, res, next) => {
   try {
     await pool.query("SELECT 1");
-    return res.json({ status: "ok" });
+    return res.json({ status: "ok", service: "backend" });
   } catch (error) {
     return next(error);
   }
@@ -126,43 +120,8 @@ app.post(
 app.delete("/api/admin/media/uploads/:id", requireRoles("super_admin", "admin", "moderator"), deleteMedia);
 app.use("/api", api);
 
-app.get("/admin.html", (_req, res) => res.redirect(308, "/admin"));
-app.get("/admin", (_req, res, next) => {
-  res.sendFile(path.join(root, "admin.html"), (error) => {
-    if (error) next(error);
-  });
-});
-
-const publicFiles = new Set([
-  "/",
-  "/index.html",
-  "/styles.css",
-  "/app.js",
-  "/content.js",
-  "/onusondhan-logo.png",
-  "/admin.css",
-  "/admin.js",
-  "/article.html",
-  "/article.js",
-  "/test-assets/article-1.svg",
-  "/test-assets/article-2.svg",
-  "/test-assets/article-3.svg",
-  "/test-assets/article-4.svg",
-  "/test-assets/article-5.svg",
-  "/test-assets/article-6.svg",
-  "/test-assets/article-7.svg",
-  "/test-assets/article-8.svg",
-]);
-app.use((req, res, next) => {
-  if (!publicFiles.has(req.path)) return next();
-  const filename = req.path === "/" ? "index.html" : req.path.slice(1);
-  return res.sendFile(path.join(root, filename), (error) => {
-    if (error) next(error);
-  });
-});
-
 app.use("/api", (_req, res) => res.status(404).json({ error: "API endpoint not found." }));
-app.use((_req, res) => res.status(404).type("text").send("Page not found."));
+app.use((_req, res) => res.status(404).json({ error: "Not found." }));
 
 app.use((error, _req, res, next) => {
   if (res.headersSent) return next(error);
@@ -184,8 +143,8 @@ app.use((error, _req, res, next) => {
   });
 });
 
-const server = app.listen(config.port, () => {
-  console.log(`Onusondhan server listening on port ${config.port}`);
+const server = app.listen(config.port, "0.0.0.0", () => {
+  console.log(`Onusondhan API listening on port ${config.port}`);
 });
 
 async function shutdown(signal) {
