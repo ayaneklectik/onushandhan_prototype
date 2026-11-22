@@ -28,13 +28,26 @@
     "headline-list": "Headlines only",
   };
   const navigation = [
-    { id: "dashboard", label: "Dashboard", symbol: "⌂", roles: ["super_admin", "admin", "moderator"] },
-    { id: "articles", label: "Manage all news", symbol: "▤", roles: ["super_admin", "admin", "moderator"] },
-    { id: "videos", label: "Videos", symbol: "▷", roles: ["super_admin", "admin", "moderator"] },
-    { id: "categories", label: "Categories", symbol: "▦", roles: ["super_admin"] },
-    { id: "sections", label: "Homepage sections", symbol: "▣", roles: ["super_admin"] },
-    { id: "settings", label: "Site settings", symbol: "⚙", roles: ["super_admin"] },
-    { id: "users", label: "Users", symbol: "♙", roles: ["super_admin", "admin"] },
+    { id: "dashboard", label: "Dashboard", group: "Overview", symbol: "⌂", roles: ["super_admin", "admin", "moderator"] },
+    { id: "articles", label: "New Post / Edit Posts", group: "Posts / Articles", symbol: "▤", roles: ["super_admin", "admin", "moderator"] },
+    { id: "drafts", label: "Drafts", group: "Posts / Articles", symbol: "◷", roles: ["super_admin", "admin", "moderator"] },
+    { id: "top-news", label: "Top News", group: "Editorial", symbol: "★", roles: ["super_admin"] },
+    { id: "recent", label: "Recent", group: "Editorial", symbol: "◷", roles: ["super_admin"] },
+    { id: "breaking", label: "Breaking", group: "Editorial", symbol: "!", roles: ["super_admin"] },
+    { id: "popular", label: "Popular", group: "Editorial", symbol: "↗", roles: ["super_admin"] },
+    { id: "special", label: "Special", group: "Editorial", symbol: "✦", roles: ["super_admin"] },
+    { id: "categories", label: "Categories", group: "Editorial", symbol: "▦", roles: ["super_admin"] },
+    { id: "editors", label: "Editors", group: "Editorial", symbol: "♙", roles: ["super_admin", "admin"] },
+    { id: "writings", label: "Writings", group: "Content", symbol: "✎", roles: ["super_admin"] },
+    { id: "ads", label: "Ads", group: "Content", symbol: "▧", roles: ["super_admin"] },
+    { id: "header", label: "Header", group: "Appearance", symbol: "⌃", roles: ["super_admin"] },
+    { id: "sections", label: "Layout", group: "Appearance", symbol: "▣", roles: ["super_admin"] },
+    { id: "footer", label: "Footer", group: "Appearance", symbol: "⌄", roles: ["super_admin"] },
+    { id: "social", label: "Social", group: "Appearance", symbol: "◎", roles: ["super_admin"] },
+    { id: "videos", label: "Videos", group: "Media", symbol: "▷", roles: ["super_admin", "admin", "moderator"] },
+    { id: "users", label: "Users", group: "Administration", symbol: "♙", roles: ["super_admin", "admin"] },
+    { id: "settings", label: "Site Settings", group: "Administration", symbol: "⚙", roles: ["super_admin"] },
+    { id: "profile", label: "Profile · Avatar & Password", group: "Account", symbol: "●", roles: ["super_admin", "admin", "moderator"] },
   ];
 
   const loginPanel = document.querySelector("#login-panel");
@@ -142,15 +155,13 @@
   }
 
   function renderNavigation() {
-    nav.innerHTML = navigation
-      .filter((item) => item.roles.includes(state.user.role))
-      .map((item) => `
+    const allowed = navigation.filter((item) => item.roles.includes(state.user.role));
+    const groups = [...new Set(allowed.map((item) => item.group))];
+    nav.innerHTML = groups.map((group) => `
+      <div class="nav-group"><p class="sidebar-label">${group}</p>${allowed.filter((item) => item.group === group).map((item) => `
         <a href="#${item.id}" data-view="${item.id}" ${state.view === item.id ? 'aria-current="page"' : ""}>
-          <span class="nav-symbol" aria-hidden="true">${item.symbol}</span>
-          <span>${item.label}</span>
-        </a>
-      `)
-      .join("");
+          <span class="nav-symbol" aria-hidden="true">${item.symbol}</span><span>${item.label}</span>
+        </a>`).join("")}</div>`).join("");
   }
 
   function setHeading(title, description = "", action = "") {
@@ -185,12 +196,16 @@
     pageContent.innerHTML = `<div class="empty-panel">${emptyPanel("Loading…")}</div>`;
     try {
       if (view === "dashboard") await renderDashboard();
-      if (view === "articles") await renderArticles();
+      if (view === "articles") { state.articleFilters = {}; state.articleOffset = 0; await renderArticles(); }
+      if (view === "drafts") { state.articleFilters = { status: "draft" }; state.articleOffset = 0; await renderArticles(); }
       if (view === "videos") await renderVideos();
       if (view === "categories") await renderCategories();
       if (view === "sections") await renderSections();
-      if (view === "settings") await renderSettings();
-      if (view === "users") await renderUsers();
+      if (view === "settings" || view === "header" || view === "footer" || view === "social") await renderSettings(view);
+      if (view === "users" || view === "editors") await renderUsers(view === "editors");
+      if (["top-news", "recent", "breaking", "popular", "special"].includes(view)) await renderPlacement(view);
+      if (view === "writings" || view === "ads") await renderContentModule(view);
+      if (view === "profile") await renderProfile();
     } catch (error) {
       pageContent.innerHTML = `<div class="empty-panel">${emptyPanel(escapeHtml(error.message))}</div>`;
       showToast(error.message, true);
@@ -330,10 +345,11 @@
       method: "POST",
       body: JSON.stringify({ mediaType, contentType: file.type, sizeBytes: file.size }),
     });
-    const formData = new FormData();
-    Object.entries(upload.fields).forEach(([name, value]) => formData.append(name, value));
-    formData.append("file", file);
-    const response = await fetch(upload.uploadUrl, { method: "POST", body: formData });
+    const response = await fetch(upload.uploadUrl, {
+      method: upload.uploadMethod || "PUT",
+      headers: { "Content-Type": upload.contentType || file.type },
+      body: file,
+    });
     if (!response.ok) throw new Error(`Upload failed (${response.status}). Check the media bucket CORS configuration.`);
     statusElement.textContent = "Verifying upload…";
     const completed = await request(`/api/admin/media/uploads/${upload.assetId}/complete`, { method: "POST" });
@@ -365,8 +381,26 @@
             <span id="article-upload-status" class="form-help"></span>
           </label>
           <label>Image description <input name="imageAlt" maxlength="300" value="${escapeHtml(article?.image_alt || "")}"></label>
+          <label class="full-width">Photo caption / ছবির ক্যাপশন <input name="imageCaption" maxlength="500" value="${escapeHtml(article?.image_caption || "")}"></label>
+          <label>Photo credit / ছবির সূত্র <input name="imageCredit" maxlength="300" value="${escapeHtml(article?.image_credit || "")}" placeholder="ছবি: নিজস্ব প্রতিবেদক"></label>
+          <label>Attribution / প্রতিবেদনের সূত্র <input name="attribution" maxlength="300" value="${escapeHtml(article?.attribution || "")}" placeholder="২৪ঘণ্টা অনলাইন"></label>
           <input type="hidden" name="imageKey" value="${escapeHtml(article?.image_key || "")}">
-          <label class="full-width">Article body <textarea name="body" maxlength="100000" rows="12">${escapeHtml(article?.body || "")}</textarea></label>
+          <label class="full-width">Article body / প্রতিবেদনের মূল লেখা
+            <div class="editor-toolbar" role="toolbar" aria-label="Text formatting">
+              <button type="button" data-format="bold"><strong>B</strong></button>
+              <button type="button" data-format="italic"><em>I</em></button>
+              <button type="button" data-format="underline"><u>U</u></button>
+              <button type="button" data-format="h2">শিরোনাম</button>
+              <button type="button" data-format="p">অনুচ্ছেদ</button>
+              <button type="button" data-format="blockquote">উদ্ধৃতি</button>
+              <button type="button" data-format="ul">• তালিকা</button>
+              <button type="button" data-format="ol">১. তালিকা</button>
+              <button type="button" data-format="link">লিংক</button>
+              <button type="button" data-format="remove">ফরম্যাট মুছুন</button>
+            </div>
+            <div id="article-body-editor" class="article-rich-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="এখানে প্রতিবেদন লিখুন…">${article?.body || ""}</div>
+            <textarea name="body" hidden maxlength="100000">${escapeHtml(article?.body || "")}</textarea>
+          </label>
         </div>
         <div class="form-actions">
           <button type="button" class="button button-secondary" data-action="close-modal">Cancel</button>
@@ -376,6 +410,34 @@
       </form>
     `);
     const form = document.querySelector("#article-editor");
+    const richEditor = form.querySelector("#article-body-editor");
+    const bodyField = form.elements.body;
+    form.querySelectorAll("[data-format]").forEach((button) => {
+      button.addEventListener("mousedown", (event) => event.preventDefault());
+      button.addEventListener("click", () => {
+        richEditor.focus();
+        const format = button.dataset.format;
+        if (format === "link") {
+          const url = window.prompt("HTTPS link URL:");
+          if (!url || !/^https:\/\//i.test(url)) return;
+          document.execCommand("createLink", false, url);
+        } else if (format === "remove") {
+          document.execCommand("removeFormat");
+        } else if (format === "h2") {
+          document.execCommand("formatBlock", false, "h2");
+        } else if (format === "p") {
+          document.execCommand("formatBlock", false, "p");
+        } else if (format === "blockquote") {
+          document.execCommand("formatBlock", false, "blockquote");
+        } else if (format === "ul") {
+          document.execCommand("insertUnorderedList");
+        } else if (format === "ol") {
+          document.execCommand("insertOrderedList");
+        } else {
+          document.execCommand(format);
+        }
+      });
+    });
     const file = document.querySelector("#article-image-file");
     file.addEventListener("change", async () => {
       const status = document.querySelector("#article-upload-status");
@@ -392,12 +454,16 @@
     form.addEventListener("submit", async (event) => {
       event.preventDefault();
       const submitAction = event.submitter?.dataset.submitAction || "save";
+      bodyField.value = richEditor.innerHTML;
       const formData = new FormData(form);
       const data = {
         title: formData.get("title"),
         headline: formData.get("headline"),
         summary: formData.get("summary"),
-        body: formData.get("body"),
+        body: form.querySelector("#article-body-editor").innerHTML,
+        attribution: formData.get("attribution"),
+        imageCaption: formData.get("imageCaption"),
+        imageCredit: formData.get("imageCredit"),
         categoryId: formData.get("categoryId") || null,
         imageKey: formData.get("imageKey") || null,
         imageAlt: formData.get("imageAlt"),
@@ -694,8 +760,9 @@
     });
   }
 
-  async function renderUsers() {
-    const { users } = await request("/api/admin/users");
+  async function renderUsers(editorsOnly = false) {
+    const { users: allUsers } = await request("/api/admin/users");
+    const users = editorsOnly ? allUsers.filter(user => ["admin", "moderator"].includes(user.role)) : allUsers;
     const rows = users.map((user) => {
       const actions = [];
       if (state.user.role === "super_admin" && user.id !== state.user.id) {
@@ -713,17 +780,17 @@
       </tr>`;
     }).join("");
     pageContent.innerHTML = `
-      ${setHeading("User management", state.user.role === "super_admin" ? "Manage staff accounts, roles, and active access." : "View registered accounts and create Moderator accounts.",
+      ${setHeading(editorsOnly ? "Editors" : "User management", editorsOnly ? "Manage newsroom editors and moderators." : state.user.role === "super_admin" ? "Manage staff accounts, roles, and active access." : "View registered accounts and create Moderator accounts.",
         '<button class="button button-primary" data-action="new-user">＋ Create user</button>')}
       <div class="table-panel"><div class="table-scroll"><table><thead><tr><th>Account</th><th>Role</th><th>Status</th><th>Sessions</th><th>Last sign in</th><th>Actions</th></tr></thead>
         <tbody>${rows || `<tr><td colspan="6">${emptyPanel("No accounts found.")}</td></tr>`}</tbody></table></div></div>
     `;
   }
 
-  async function renderSettings() {
+  async function renderSettings(section = "settings") {
     const { settings } = await request("/api/admin/settings");
     pageContent.innerHTML = `
-      ${setHeading("Site settings", "Update the contact details and social links shown on the public website.")}
+      ${setHeading(section === "header" ? "Header" : section === "footer" ? "Footer" : section === "social" ? "Social" : "Site settings", "Manage public website presentation and availability.")}
       <form id="site-settings-form" class="panel section-card stack-form">
         <div class="form-grid">
           <label>Site name <input name="site_name" maxlength="100" required value="${escapeHtml(settings.site_name || "")}"></label>
@@ -731,9 +798,15 @@
           <label>Facebook URL <input name="facebook_url" type="url" placeholder="https://facebook.com/…" value="${escapeHtml(settings.facebook_url || "")}"></label>
           <label>YouTube URL <input name="youtube_url" type="url" placeholder="https://youtube.com/…" value="${escapeHtml(settings.youtube_url || "")}"></label>
           <label>Instagram URL <input name="instagram_url" type="url" placeholder="https://instagram.com/…" value="${escapeHtml(settings.instagram_url || "")}"></label>
+          <label class="full-width">Header announcement <input name="header_text" maxlength="240" value="${escapeHtml(settings.header_text || "")}"></label>
+          <label class="full-width">Footer note <input name="footer_text" maxlength="500" value="${escapeHtml(settings.footer_text || "")}"></label>
+          <p class="form-help full-width">Maintenance mode blocks all public pages, article URLs, category pages and public APIs. Admin access remains available.</p>
         </div>
         <p class="form-help">Social links are optional. Leave a field blank to hide its icon from the public site.</p>
-        <div class="form-actions"><button type="submit" class="button button-primary">Save settings</button></div>
+        <div class="form-actions">
+          <button type="submit" class="button button-primary">Save settings</button>
+          <button type="button" class="button ${settings.maintenance_mode === "true" ? "button-danger" : "button-secondary"}" data-action="toggle-maintenance">${settings.maintenance_mode === "true" ? "Disable Undermaintaince" : "Undermaintaince"}</button>
+        </div>
       </form>
     `;
     document.querySelector("#site-settings-form").addEventListener("submit", async (event) => {
@@ -742,12 +815,80 @@
       try {
         await request("/api/admin/settings", {
           method: "PATCH",
-          body: JSON.stringify(Object.fromEntries(new FormData(form))),
+          body: JSON.stringify({
+            ...Object.fromEntries(new FormData(form)),
+          }),
         });
         showToast("Site settings saved.");
       } catch (error) {
         showToast(error.message, true);
       }
+    });
+  }
+
+
+  const placementNames = {"top-news":"top",recent:"recent",breaking:"breaking",popular:"popular",special:"special"};
+  async function renderPlacement(view) {
+    const placement=placementNames[view];
+    const [{articles:current},{articles:available}]=await Promise.all([
+      request(`/api/admin/placements/${placement}`),
+      request("/api/admin/articles?status=published&limit=100"),
+    ]);
+    const selected=new Set(current.map(item=>item.id));
+    pageContent.innerHTML=`
+      ${setHeading(({ "top-news":"Top News",recent:"Recent",breaking:"Breaking",popular:"Popular",special:"Special"})[view],"Select published articles and save their display order.")}
+      <form id="placement-form" class="panel section-card stack-form">
+        <div class="article-checklist">${available.map(item=>`<label><input type="checkbox" name="articleIds" value="${item.id}" ${selected.has(item.id)?"checked":""}><span><strong>${escapeHtml(item.headline||item.title)}</strong><small>${escapeHtml(item.slug)}</small></span></label>`).join("")||emptyPanel("Publish articles first.")}</div>
+        <div class="form-actions"><button class="button button-primary" type="submit">Save selection</button></div>
+      </form>`;
+    document.querySelector("#placement-form").addEventListener("submit",async event=>{
+      event.preventDefault(); const articleIds=[...new FormData(event.currentTarget).getAll("articleIds")];
+      try{await request(`/api/admin/placements/${placement}`,{method:"PUT",body:JSON.stringify({articleIds})});showToast("Editorial selection saved.");}
+      catch(error){showToast(error.message,true);}
+    });
+  }
+
+  async function renderContentModule(module) {
+    const {entries}=await request(`/api/admin/content/${module}`);
+    const title=module==="ads"?"Ads":"Writings";
+    const rows=entries.map(entry=>`<tr><td><strong>${escapeHtml(entry.title)}</strong><small>${escapeHtml(entry.content||"")}</small></td><td>${escapeHtml(entry.placement||"—")}</td><td>${entry.is_enabled?"Enabled":"Disabled"}</td><td><div class="row-actions"><button class="button button-secondary" data-action="edit-content" data-id="${entry.id}">Edit</button><button class="button button-danger" data-action="delete-content" data-id="${entry.id}">Delete</button></div></td></tr>`).join("");
+    pageContent.innerHTML=`${setHeading(title,module==="ads"?"Manage ad creatives, links and placements.":"Manage editorial writings and opinion pieces.",'<button class="button button-primary" data-action="new-content">＋ Add entry</button>')}<div class="table-panel"><div class="table-scroll"><table><thead><tr><th>Entry</th><th>Placement</th><th>Status</th><th>Actions</th></tr></thead><tbody>${rows||'<tr><td colspan="4">No entries yet.</td></tr>'}</tbody></table></div></div>`;
+  }
+
+  async function openContentEditor(module,id="") {
+    const {entries}=await request(`/api/admin/content/${module}`); const entry=entries.find(item=>item.id===id);
+    openModal(entry?"Edit entry":"Add entry",`<form id="content-entry-form" class="stack-form">
+      <label>Title<input name="title" maxlength="180" required value="${escapeHtml(entry?.title||"")}"></label>
+      <label>Content / description<textarea name="content" rows="5" maxlength="20000">${escapeHtml(entry?.content||"")}</textarea></label>
+      <label>Target URL<input name="targetUrl" type="url" maxlength="1000" value="${escapeHtml(entry?.target_url||"")}"></label>
+      <label>Image URL<input name="imageUrl" type="url" maxlength="1000" value="${escapeHtml(entry?.image_url||"")}"></label>
+      <label>Placement<input name="placement" maxlength="80" placeholder="e.g. homepage, sidebar, article-inline" value="${escapeHtml(entry?.placement||"")}"></label>
+      <label>Display order<input name="sortOrder" type="number" min="0" max="10000" value="${entry?.sort_order??0}"></label>
+      <label class="inline-toggle"><input name="isEnabled" type="checkbox" ${entry?.is_enabled!==false?"checked":""}><span class="toggle-track"></span> Enabled</label>
+      <div class="form-actions"><button type="button" class="button button-secondary" data-action="close-modal">Cancel</button><button class="button button-primary" type="submit">Save</button></div>
+    </form>`);
+    document.querySelector("#content-entry-form").addEventListener("submit",async event=>{
+      event.preventDefault();const form=event.currentTarget;
+      const body={title:form.elements.title.value,content:form.elements.content.value,targetUrl:form.elements.targetUrl.value,imageUrl:form.elements.imageUrl.value,placement:form.elements.placement.value,sortOrder:Number(form.elements.sortOrder.value),isEnabled:form.elements.isEnabled.checked};
+      try{await request(id?`/api/admin/content/${module}/${id}`:`/api/admin/content/${module}`,{method:id?"PATCH":"POST",body:JSON.stringify(body)});closeModal();showToast("Entry saved.");await renderContentModule(module);}
+      catch(error){showToast(error.message,true);}
+    });
+  }
+
+  async function renderProfile() {
+    const {profile}=await request("/api/admin/profile");
+    pageContent.innerHTML=`${setHeading("Profile","Update your newsroom account and password.")}<form id="profile-form" class="panel section-card stack-form"><div class="form-grid">
+      <label>Username<input name="username" minlength="3" maxlength="48" required value="${escapeHtml(profile.username)}"></label>
+      <label>Email<input name="email" type="email" required value="${escapeHtml(profile.email)}"></label>
+      <label class="full-width">Avatar image URL (HTTPS)<input name="avatarUrl" type="url" placeholder="https://…" value="${escapeHtml(profile.avatar_url||"")}"></label>
+      <label>Current password (only required to change password)<input name="currentPassword" type="password" autocomplete="current-password"></label>
+      <label>New password<input name="newPassword" type="password" minlength="12" maxlength="72" autocomplete="new-password"></label>
+    </div><p class="form-help">New passwords must contain at least 12 characters. Avatar upload is not configured in the current media model.</p><div class="form-actions"><button class="button button-primary" type="submit">Save profile</button></div></form>`;
+    document.querySelector("#profile-form").addEventListener("submit",async event=>{
+      event.preventDefault();const form=event.currentTarget;const body={username:form.elements.username.value,email:form.elements.email.value,avatarUrl:form.elements.avatarUrl.value};
+      if(form.elements.currentPassword.value||form.elements.newPassword.value){body.currentPassword=form.elements.currentPassword.value;body.newPassword=form.elements.newPassword.value;}
+      try{await request("/api/admin/profile",{method:"PATCH",body:JSON.stringify(body)});showToast("Profile updated.");}
+      catch(error){showToast(error.message,true);}
     });
   }
 
@@ -865,6 +1006,24 @@
           });
           showToast("Category orders saved.");
           await renderCategories();
+        }
+        if (action === "toggle-maintenance") {
+          const { settings } = await request("/api/admin/settings");
+          const enable = settings.maintenance_mode !== "true";
+          const prompt = enable
+            ? "Enable maintenance mode? Public visitors will only see the maintenance page."
+            : "Disable maintenance mode and restore the public website?";
+          if (!window.confirm(prompt)) return;
+          await request("/api/admin/settings", { method: "PATCH", body: JSON.stringify({ maintenance_mode: enable ? "true" : "false" }) });
+          showToast(enable ? "Maintenance mode enabled. Public website is now offline." : "Maintenance mode disabled. Public website is live.");
+          await renderSettings(state.view);
+        }
+        if (action === "new-content") await openContentEditor(state.view);
+        if (action === "edit-content") await openContentEditor(state.view,id);
+        if (action === "delete-content") {
+          if(!window.confirm("Delete this entry permanently?")) return;
+          await request(`/api/admin/content/${state.view}/${id}`,{method:"DELETE"});
+          showToast("Entry deleted."); await renderContentModule(state.view);
         }
         if (action === "new-article") await openArticleEditor();
         if (action === "edit-article") await openArticleEditor(id);

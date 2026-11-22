@@ -11,12 +11,42 @@
 
   function renderBody(body) {
     const fragment = document.createDocumentFragment();
-    body.split(/\n{2,}/).forEach((paragraph) => {
-      if (!paragraph.trim()) return;
-      const element = document.createElement("p");
-      element.textContent = paragraph.trim();
-      fragment.append(element);
-    });
+    const parsed = new DOMParser().parseFromString(String(body || ""), "text/html");
+    const allowed = new Set(["P", "BR", "H2", "H3", "STRONG", "B", "EM", "I", "U", "UL", "OL", "LI", "BLOCKQUOTE", "A"]);
+    const copySafe = (source, target) => {
+      for (const child of source.childNodes) {
+        if (child.nodeType === Node.TEXT_NODE) {
+          target.append(document.createTextNode(child.textContent));
+          continue;
+        }
+        if (child.nodeType !== Node.ELEMENT_NODE) continue;
+        if (!allowed.has(child.tagName)) {
+          copySafe(child, target);
+          continue;
+        }
+        const element = document.createElement(child.tagName.toLowerCase());
+        if (child.tagName === "A") {
+          const href = child.getAttribute("href") || "";
+          if (/^https:\/\//i.test(href)) {
+            element.href = href;
+            element.target = "_blank";
+            element.rel = "noopener noreferrer";
+          }
+        }
+        copySafe(child, element);
+        target.append(element);
+      }
+    };
+    if (/<\/?(p|h2|h3|strong|b|em|i|u|ul|ol|li|blockquote|a|br)\b/i.test(body || "")) {
+      copySafe(parsed.body, fragment);
+    } else {
+      String(body || "").split(/\n{2,}/).forEach((paragraph) => {
+        if (!paragraph.trim()) return;
+        const element = document.createElement("p");
+        element.textContent = paragraph.trim();
+        fragment.append(element);
+      });
+    }
     return fragment;
   }
 
@@ -35,6 +65,16 @@
       if (siteResponse.ok) {
         const site = await siteResponse.json();
         siteSettings = site.settings || {};
+        const headerAnnouncement = document.querySelector("#header-announcement");
+        if (headerAnnouncement) {
+          headerAnnouncement.textContent = siteSettings.header_text || "";
+          headerAnnouncement.hidden = !siteSettings.header_text;
+        }
+        const footerNote = document.querySelector("#footer-note");
+        if (footerNote) {
+          footerNote.textContent = siteSettings.footer_text || "";
+          footerNote.hidden = !siteSettings.footer_text;
+        }
         if (site.settings?.contact_email) {
           const email = document.querySelector("#contact-email");
           email.href = `mailto:${site.settings.contact_email}`;
@@ -78,14 +118,30 @@
         dateStyle: "long",
         timeStyle: "short",
       }).format(new Date(article.published_at))}`;
-      const elements = [category, title, meta];
+      const elements = [category, title];
+      if (article.attribution) {
+        const attribution = document.createElement("p");
+        attribution.className = "article-attribution";
+        attribution.textContent = article.attribution;
+        elements.push(attribution);
+      }
+      elements.push(meta);
       if (article.summary) elements.push(summary);
       if (article.image) {
         const image = document.createElement("img");
         image.className = "article-hero-image";
         image.src = article.image;
         image.alt = article.image_alt || "";
-        elements.push(image);
+        const figure = document.createElement("figure");
+        figure.className = "article-hero-figure";
+        figure.append(image);
+        if (article.image_caption || article.image_credit) {
+          const caption = document.createElement("figcaption");
+          caption.className = "article-image-caption";
+          caption.textContent = [article.image_caption, article.image_credit].filter(Boolean).join(" | ");
+          figure.append(caption);
+        }
+        elements.push(figure);
       }
       const body = document.createElement("div");
       body.className = "article-body";

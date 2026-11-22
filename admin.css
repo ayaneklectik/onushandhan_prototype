@@ -955,3 +955,15 @@ textarea {
     bottom: 12px;
   }
 }
+
+
+.editor-toolbar{display:flex;flex-wrap:wrap;gap:6px;padding:9px;border:1px solid var(--line);border-bottom:0;border-radius:5px 5px 0 0;background:#f8f8f9}
+.editor-toolbar button{min-width:34px;min-height:32px;padding:5px 9px;border:1px solid #dfe1e5;border-radius:4px;background:#fff;color:#333;cursor:pointer;font-size:12px}
+.editor-toolbar button:hover{border-color:var(--red);color:var(--red)}
+.article-rich-editor{min-height:320px;max-height:65vh;overflow:auto;padding:16px;border:1px solid var(--line);border-radius:0 0 5px 5px;background:#fff;font-size:15px;line-height:1.9;outline:none}
+.article-rich-editor:focus{border-color:var(--red);box-shadow:0 0 0 2px rgb(160 0 0 / 8%)}
+.article-rich-editor:empty::before{content:attr(data-placeholder);color:#999;pointer-events:none}
+.article-rich-editor h2{font-size:1.35em}.article-rich-editor blockquote{margin:14px 0;padding:8px 14px;border-left:3px solid var(--red);background:#faf4f4}
+.article-rich-editor ul,.article-rich-editor ol{padding-left:28px}
+
+.nav-group{margin:0 0 18px}.nav-group .sidebar-label{margin:0 0 7px;padding:0 12px}.nav-group a{margin-bottom:3px}
