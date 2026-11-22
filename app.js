@@ -327,6 +327,28 @@
     section.append(list); return section;
   }
 
+  function contentEntryBlock(title, entries, isAds = false) {
+    if (!entries?.length) return null;
+    const section=document.createElement("section"); section.className=isAds?"homepage-section sponsored-content":"homepage-section editorial-writings";
+    const heading=document.createElement("div"); heading.className="section-heading";
+    const h=document.createElement("h2"); h.textContent=title;
+    const rule=document.createElement("span"); rule.className="heading-rule"; rule.setAttribute("aria-hidden","true");
+    heading.append(h,rule); section.append(heading);
+    const grid=document.createElement("div"); grid.className="news-list";
+    entries.forEach(entry=>{
+      const card=document.createElement("article"); card.className="news-card";
+      if(entry.image_url){const img=document.createElement("img");img.src=entry.image_url;img.alt=entry.title;img.loading="lazy";card.append(img);}
+      const body=document.createElement("div"); body.className="news-card-content";
+      const titleNode=document.createElement("h3");
+      if(entry.target_url){const link=document.createElement("a");link.href=entry.target_url;link.textContent=entry.title;link.rel="noopener noreferrer";titleNode.append(link);}
+      else titleNode.textContent=entry.title;
+      body.append(titleNode);
+      if(entry.content){const description=document.createElement("p");description.textContent=entry.content;body.append(description);}
+      card.append(body);grid.append(card);
+    });
+    section.append(grid); return section;
+  }
+
   function homePage(data, articles) {
     document.body.classList.add("is-home");
     contentLayout.classList.add("is-home-layout");
@@ -410,6 +432,12 @@
       const element = sectionBlock(section);
       if (element) homeLayout.append(element);
     });
+    const writings = (data.contentEntries || []).filter(entry => entry.module === "writings");
+    const ads = (data.contentEntries || []).filter(entry => entry.module === "ads");
+    const writingBlock = contentEntryBlock("লেখালেখি", writings);
+    const adsBlock = contentEntryBlock("বিজ্ঞাপন", ads, true);
+    if (writingBlock) homeLayout.append(writingBlock);
+    if (adsBlock) homeLayout.append(adsBlock);
   }
 
   function sectionBlock(section) {
