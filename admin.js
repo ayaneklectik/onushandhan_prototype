@@ -760,8 +760,9 @@
     });
   }
 
-  async function renderUsers() {
-    const { users } = await request("/api/admin/users");
+  async function renderUsers(editorsOnly = false) {
+    const { users: allUsers } = await request("/api/admin/users");
+    const users = editorsOnly ? allUsers.filter(user => ["admin", "moderator"].includes(user.role)) : allUsers;
     const rows = users.map((user) => {
       const actions = [];
       if (state.user.role === "super_admin" && user.id !== state.user.id) {
@@ -779,7 +780,7 @@
       </tr>`;
     }).join("");
     pageContent.innerHTML = `
-      ${setHeading("User management", state.user.role === "super_admin" ? "Manage staff accounts, roles, and active access." : "View registered accounts and create Moderator accounts.",
+      ${setHeading(editorsOnly ? "Editors" : "User management", editorsOnly ? "Manage newsroom editors and moderators." : state.user.role === "super_admin" ? "Manage staff accounts, roles, and active access." : "View registered accounts and create Moderator accounts.",
         '<button class="button button-primary" data-action="new-user">＋ Create user</button>')}
       <div class="table-panel"><div class="table-scroll"><table><thead><tr><th>Account</th><th>Role</th><th>Status</th><th>Sessions</th><th>Last sign in</th><th>Actions</th></tr></thead>
         <tbody>${rows || `<tr><td colspan="6">${emptyPanel("No accounts found.")}</td></tr>`}</tbody></table></div></div>
