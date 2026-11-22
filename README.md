@@ -143,3 +143,28 @@ npm run seed:remove-test-articles
 ```
 
 Images still referenced by other articles or videos are preserved. Back up the database and bucket before cleanup. Demo articles are published for frontend testing and are visibly labelled as test content; do not leave them on a public production site.
+
+
+## Deploying with Dockploy
+
+This repository includes a root-level `Dockerfile`. In Dockploy, create an application from this Git repository, select the branch you want to deploy, and use the Dockerfile build option. The container runs pending SQL migrations before starting the Express server.
+
+Provision PostgreSQL separately (Dockploy database service or managed PostgreSQL) and configure these application environment variables:
+
+- `NODE_ENV=production`
+- `PORT=3000`
+- `DATABASE_URL` — PostgreSQL connection string
+- `SESSION_SECRET` — at least 32 random characters
+- `TRUST_PROXY=1` when deployed behind Dockploy's reverse proxy
+- `MEDIA_BUCKET`
+- `MEDIA_ACCESS_KEY_ID`
+- `MEDIA_SECRET_ACCESS_KEY`
+- `MEDIA_PUBLIC_BASE_URL`
+- `MEDIA_ENDPOINT` and `MEDIA_REGION` for the S3-compatible provider (Cloudflare R2 uses its account S3 endpoint and region `auto`)
+- `MEDIA_FORCE_PATH_STYLE=false` for Cloudflare R2
+
+The service listens on the configured `PORT` and exposes `/healthz` for container health checks. Persistent media belongs in the configured S3-compatible bucket, not the container filesystem. Keep PostgreSQL and media credentials in Dockploy environment settings; never commit them.
+
+After the first deployment, create the initial Super Admin using the one-off command `npm run admin:create-superadmin` in the application container. The admin interface is available at `/admin`.
+
+Migrations are applied automatically at container startup. Take a database backup before deploying schema changes to an existing production database.

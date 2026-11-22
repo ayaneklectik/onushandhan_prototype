@@ -314,6 +314,41 @@
     return section;
   }
 
+  function placementBlock(title, items, className = "") {
+    if (!items?.length) return null;
+    const section=document.createElement("section");
+    section.className=`homepage-section editorial-placement ${className}`;
+    const heading=document.createElement("div"); heading.className="section-heading";
+    const label=document.createElement("h2"); label.textContent=title;
+    const rule=document.createElement("span"); rule.className="heading-rule"; rule.setAttribute("aria-hidden","true");
+    heading.append(label,rule); section.append(heading);
+    const list=document.createElement("div"); list.className="news-list";
+    items.forEach(article=>list.append(articleCard(article)));
+    section.append(list); return section;
+  }
+
+  function contentEntryBlock(title, entries, isAds = false) {
+    if (!entries?.length) return null;
+    const section=document.createElement("section"); section.className=isAds?"homepage-section sponsored-content":"homepage-section editorial-writings";
+    const heading=document.createElement("div"); heading.className="section-heading";
+    const h=document.createElement("h2"); h.textContent=title;
+    const rule=document.createElement("span"); rule.className="heading-rule"; rule.setAttribute("aria-hidden","true");
+    heading.append(h,rule); section.append(heading);
+    const grid=document.createElement("div"); grid.className="news-list";
+    entries.forEach(entry=>{
+      const card=document.createElement("article"); card.className="news-card";
+      if(entry.image_url){const img=document.createElement("img");img.src=entry.image_url;img.alt=entry.title;img.loading="lazy";card.append(img);}
+      const body=document.createElement("div"); body.className="news-card-content";
+      const titleNode=document.createElement("h3");
+      if(entry.target_url){const link=document.createElement("a");link.href=entry.target_url;link.textContent=entry.title;link.rel="noopener noreferrer";titleNode.append(link);}
+      else titleNode.textContent=entry.title;
+      body.append(titleNode);
+      if(entry.content){const description=document.createElement("p");description.textContent=entry.content;body.append(description);}
+      card.append(body);grid.append(card);
+    });
+    section.append(grid); return section;
+  }
+
   function homePage(data, articles) {
     document.body.classList.add("is-home");
     contentLayout.classList.add("is-home-layout");
@@ -323,7 +358,7 @@
     homepageSections.replaceChildren();
 
     const sections = [...data.sections].sort((a, b) => a.sort_order - b.sort_order);
-    if (!articles.length && !data.videos.length && !sections.some((section) => section.articles.length)) {
+    if (!articles.length && !data.videos.length && !sections.some((section) => section.articles.length) && !Object.values(data.placements || {}).some(items => items.length) && !(data.contentEntries || []).length) {
       const emptyState = document.createElement("div");
       emptyState.className = "empty-state";
       const message = document.createElement("p");
@@ -352,6 +387,18 @@
       leadGrid.append(live);
     }
     homeLayout.append(leadGrid);
+
+    const placementLabels = [
+      ["top", "শীর্ষ সংবাদ", "is-top-news"],
+      ["breaking", "ব্রেকিং নিউজ", "is-breaking"],
+      ["popular", "জনপ্রিয় সংবাদ", "is-popular"],
+      ["special", "বিশেষ প্রতিবেদন", "is-special"],
+      ["recent", "সাম্প্রতিক", "is-recent"],
+    ];
+    placementLabels.forEach(([key,label,className]) => {
+      const block=placementBlock(label,data.placements?.[key],className);
+      if(block) homeLayout.append(block);
+    });
 
     const lower = document.createElement("div");
     lower.className = "home-lower-grid";
@@ -385,6 +432,12 @@
       const element = sectionBlock(section);
       if (element) homeLayout.append(element);
     });
+    const writings = (data.contentEntries || []).filter(entry => entry.module === "writings");
+    const ads = (data.contentEntries || []).filter(entry => entry.module === "ads");
+    const writingBlock = contentEntryBlock("লেখালেখি", writings);
+    const adsBlock = contentEntryBlock("বিজ্ঞাপন", ads, true);
+    if (writingBlock) homeLayout.append(writingBlock);
+    if (adsBlock) homeLayout.append(adsBlock);
   }
 
   function sectionBlock(section) {
@@ -429,6 +482,16 @@
     }
 
     const categories = [{ slug: "latest", name: "সর্বশেষ সংবাদ", id: null }, ...data.categories];
+    const headerAnnouncement = document.querySelector("#header-announcement");
+    if (headerAnnouncement) {
+      headerAnnouncement.textContent = data.settings?.header_text || "";
+      headerAnnouncement.hidden = !data.settings?.header_text;
+    }
+    const footerNote = document.querySelector("#footer-note");
+    if (footerNote) {
+      footerNote.textContent = data.settings?.footer_text || "";
+      footerNote.hidden = !data.settings?.footer_text;
+    }
     if (data.settings?.contact_email) {
       const email = document.querySelector("#contact-email");
       email.href = `mailto:${data.settings.contact_email}`;

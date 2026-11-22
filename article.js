@@ -65,6 +65,16 @@
       if (siteResponse.ok) {
         const site = await siteResponse.json();
         siteSettings = site.settings || {};
+        const headerAnnouncement = document.querySelector("#header-announcement");
+        if (headerAnnouncement) {
+          headerAnnouncement.textContent = siteSettings.header_text || "";
+          headerAnnouncement.hidden = !siteSettings.header_text;
+        }
+        const footerNote = document.querySelector("#footer-note");
+        if (footerNote) {
+          footerNote.textContent = siteSettings.footer_text || "";
+          footerNote.hidden = !siteSettings.footer_text;
+        }
         if (site.settings?.contact_email) {
           const email = document.querySelector("#contact-email");
           email.href = `mailto:${site.settings.contact_email}`;
