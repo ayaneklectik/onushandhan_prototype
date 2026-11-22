@@ -7,4 +7,3 @@ coverage
 npm-debug.log*
 .DS_Store
 Screenshot*.png
-test-assets
