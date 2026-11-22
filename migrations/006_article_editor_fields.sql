@@ -1,0 +1,4 @@
+ALTER TABLE articles
+  ADD COLUMN attribution TEXT NOT NULL DEFAULT '',
+  ADD COLUMN image_caption TEXT NOT NULL DEFAULT '',
+  ADD COLUMN image_credit TEXT NOT NULL DEFAULT '';
