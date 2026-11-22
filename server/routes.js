@@ -194,7 +194,7 @@ api.get("/public/site", async (_req, res) => {
   );
   const settingsResult = await pool.query(
     `SELECT setting_key, setting_value FROM site_settings
-     WHERE setting_key IN ('site_name', 'contact_email', 'facebook_url', 'youtube_url', 'instagram_url', 'maintenance_mode', 'header_text', 'footer_text')`,
+     WHERE setting_key IN ('site_name', 'contact_email', 'facebook_url', 'youtube_url', 'instagram_url', 'header_text', 'footer_text')`,
   );
 
   const articles = articlesResult.rows.map((article) => ({
