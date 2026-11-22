@@ -1235,13 +1235,14 @@ api.put("/admin/placements/:placement", requireRoles(SUPER), async (req,res)=>{
 });
 
 api.get("/admin/profile", requireAuth, async (req,res)=>{
-  const result=await pool.query("SELECT id,username,email,role FROM users WHERE id=$1",[req.user.id]);
+  const result=await pool.query("SELECT id,username,email,role,avatar_url FROM users WHERE id=$1",[req.user.id]);
   return res.json({profile:result.rows[0]});
 });
 api.patch("/admin/profile", requireAuth, async (req,res)=>{
   const input=parse(z.object({
     username:z.string().trim().min(3).max(48).regex(/^[a-zA-Z0-9._-]+$/).optional(),
     email:z.string().trim().email().max(254).optional(),
+    avatarUrl:z.union([z.literal(""),z.string().url().max(1000).refine(v=>v.startsWith("https://"))]).optional(),
     currentPassword:z.string().min(1).max(72).optional(),
     newPassword:z.string().min(12).max(72).refine(v=>Buffer.byteLength(v,"utf8")<=72).optional(),
   }).strict().refine(v=>(v.newPassword===undefined)===(v.currentPassword===undefined),{message:"Current and new password must be provided together."}),req.body,res);
@@ -1253,6 +1254,7 @@ api.patch("/admin/profile", requireAuth, async (req,res)=>{
   const updates=[],values=[];
   if(input.username!==undefined){values.push(input.username);updates.push("username=$"+values.length);}
   if(input.email!==undefined){values.push(input.email.toLowerCase());updates.push("email=$"+values.length);}
+  if(input.avatarUrl!==undefined){values.push(input.avatarUrl);updates.push("avatar_url=$"+values.length);}
   if(input.newPassword){values.push(await bcrypt.hash(input.newPassword,12));updates.push("password_hash=$"+values.length);}
   if(!updates.length) return res.status(400).json({error:"No profile changes provided."});
   values.push(req.user.id);
