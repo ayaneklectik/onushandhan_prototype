@@ -358,7 +358,7 @@
     homepageSections.replaceChildren();
 
     const sections = [...data.sections].sort((a, b) => a.sort_order - b.sort_order);
-    if (!articles.length && !data.videos.length && !sections.some((section) => section.articles.length)) {
+    if (!articles.length && !data.videos.length && !sections.some((section) => section.articles.length) && !Object.values(data.placements || {}).some(items => items.length) && !(data.contentEntries || []).length) {
       const emptyState = document.createElement("div");
       emptyState.className = "empty-state";
       const message = document.createElement("p");
