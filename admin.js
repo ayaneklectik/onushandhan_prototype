@@ -800,10 +800,13 @@
           <label>Instagram URL <input name="instagram_url" type="url" placeholder="https://instagram.com/…" value="${escapeHtml(settings.instagram_url || "")}"></label>
           <label class="full-width">Header announcement <input name="header_text" maxlength="240" value="${escapeHtml(settings.header_text || "")}"></label>
           <label class="full-width">Footer note <input name="footer_text" maxlength="500" value="${escapeHtml(settings.footer_text || "")}"></label>
-          <label class="inline-toggle full-width"><input name="maintenance_mode" type="checkbox" ${settings.maintenance_mode === "true" ? "checked" : ""}><span class="toggle-track"></span> Undermaintaince — show maintenance page to all public visitors</label>
+          <p class="form-help full-width">Maintenance mode blocks all public pages, article URLs, category pages and public APIs. Admin access remains available.</p>
         </div>
         <p class="form-help">Social links are optional. Leave a field blank to hide its icon from the public site.</p>
-        <div class="form-actions"><button type="submit" class="button button-primary">Save settings</button></div>
+        <div class="form-actions">
+          <button type="submit" class="button button-primary">Save settings</button>
+          <button type="button" class="button ${settings.maintenance_mode === "true" ? "button-danger" : "button-secondary"}" data-action="toggle-maintenance">${settings.maintenance_mode === "true" ? "Disable Undermaintaince" : "Undermaintaince"}</button>
+        </div>
       </form>
     `;
     document.querySelector("#site-settings-form").addEventListener("submit", async (event) => {
@@ -1004,6 +1007,17 @@
           });
           showToast("Category orders saved.");
           await renderCategories();
+        }
+        if (action === "toggle-maintenance") {
+          const { settings } = await request("/api/admin/settings");
+          const enable = settings.maintenance_mode !== "true";
+          const prompt = enable
+            ? "Enable maintenance mode? Public visitors will only see the maintenance page."
+            : "Disable maintenance mode and restore the public website?";
+          if (!window.confirm(prompt)) return;
+          await request("/api/admin/settings", { method: "PATCH", body: JSON.stringify({ maintenance_mode: enable ? "true" : "false" }) });
+          showToast(enable ? "Maintenance mode enabled. Public website is now offline." : "Maintenance mode disabled. Public website is live.");
+          await renderSettings(state.view);
         }
         if (action === "new-content") await openContentEditor(state.view);
         if (action === "edit-content") await openContentEditor(state.view,id);
