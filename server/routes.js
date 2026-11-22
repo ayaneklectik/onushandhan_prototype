@@ -747,7 +747,7 @@ api.get("/admin/sections", requireRoles(SUPER), async (_req, res) => {
 api.get("/admin/settings", requireRoles(SUPER), async (_req, res) => {
   const result = await pool.query(
     `SELECT setting_key, setting_value FROM site_settings
-     WHERE setting_key IN ('site_name', 'contact_email', 'facebook_url', 'youtube_url', 'instagram_url')
+     WHERE setting_key IN ('site_name', 'contact_email', 'facebook_url', 'youtube_url', 'instagram_url', 'maintenance_mode', 'header_text', 'footer_text')
      ORDER BY setting_key`,
   );
   return res.json({ settings: Object.fromEntries(result.rows.map((row) => [row.setting_key, row.setting_value])) });
