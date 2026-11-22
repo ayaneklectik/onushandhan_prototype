@@ -183,7 +183,7 @@ api.get("/public/site", async (_req, res) => {
   );
   const settingsResult = await pool.query(
     `SELECT setting_key, setting_value FROM site_settings
-     WHERE setting_key IN ('site_name', 'contact_email', 'facebook_url', 'youtube_url', 'instagram_url')`,
+     WHERE setting_key IN ('site_name', 'contact_email', 'facebook_url', 'youtube_url', 'instagram_url', 'maintenance_mode')`,
   );
 
   const articles = articlesResult.rows.map((article) => ({
@@ -753,6 +753,7 @@ api.patch("/admin/settings", requireRoles(SUPER), async (req, res) => {
       facebook_url: z.union([z.literal(""), z.string().url().max(500).refine((value) => value.startsWith("https://"))]).optional(),
       youtube_url: z.union([z.literal(""), z.string().url().max(500).refine((value) => value.startsWith("https://"))]).optional(),
       instagram_url: z.union([z.literal(""), z.string().url().max(500).refine((value) => value.startsWith("https://"))]).optional(),
+      maintenance_mode: z.enum(["true", "false"]).optional(),
     }).strict(),
     req.body,
     res,
