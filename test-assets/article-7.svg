@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 480">
-  <defs><linearGradient id="g" x2=".7" y2="1"><stop stop-color="#355a69"/><stop offset="1" stop-color="#d0a56f"/></linearGradient></defs>
-  <rect width="720" height="480" fill="url(#g)"/><circle cx="555" cy="110" r="72" fill="#fff3cf" opacity=".9"/>
-  <path d="M0 300h720v180H0Z" fill="#425e67" opacity=".84"/><path d="M0 350 140 270l110 70 115-130 110 130 115-70 130 75v135H0Z" fill="#79918b" opacity=".78"/>
-  <path d="M320 480V235m0 70-60-50m60 14 60-62" stroke="#e4d1a2" stroke-width="17" stroke-linecap="round"/>
-  <text x="42" y="440" fill="white" font-family="sans-serif" font-size="27" font-weight="700">পরীক্ষামূলক চিত্র ০৭</text>
-</svg>

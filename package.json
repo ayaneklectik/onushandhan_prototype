@@ -8,21 +8,23 @@
     "dev": "node --watch server/index.js",
     "db:migrate": "node scripts/migrate.js",
     "admin:create-superadmin": "node scripts/create-superadmin.js",
-    "test": "node --test",
-    "check": "node --check server/index.js && node --check server/routes.js && node --check server/auth.js && node --check server/media.js && node --check scripts/migrate.js && node --check scripts/create-superadmin.js && node --check admin.js && node --check app.js && node --check article.js && node --check content.js"
+    "test": "node --test tests/*.test.js",
+    "check": "node --check server/index.js && node --check server/routes.js && node --check server/auth.js && node --check server/media.js && node --check scripts/migrate.js && node --check scripts/create-superadmin.js && node --check scripts/test-article-seed.js && node --check scripts/seed-test-articles.js && node --check scripts/remove-test-articles.js && node --check admin.js && node --check app.js && node --check article.js && node --check content.js",
+    "seed:test-articles": "node scripts/seed-test-articles.js",
+    "seed:remove-test-articles": "node scripts/remove-test-articles.js"
   },
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.850.0",
-    "@aws-sdk/s3-presigned-post": "^3.850.0",
     "bcryptjs": "^3.0.2",
     "dotenv": "^16.6.1",
     "express": "^5.1.0",
     "express-rate-limit": "^8.0.1",
     "helmet": "^8.1.0",
     "pg": "^8.16.3",
-    "zod": "^4.1.5"
+    "zod": "^4.1.5",
+    "@aws-sdk/s3-request-presigner": "^3.850.0"
   }
 }
