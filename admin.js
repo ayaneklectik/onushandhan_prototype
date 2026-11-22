@@ -28,13 +28,26 @@
     "headline-list": "Headlines only",
   };
   const navigation = [
-    { id: "dashboard", label: "Dashboard", symbol: "⌂", roles: ["super_admin", "admin", "moderator"] },
-    { id: "articles", label: "Manage all news", symbol: "▤", roles: ["super_admin", "admin", "moderator"] },
-    { id: "videos", label: "Videos", symbol: "▷", roles: ["super_admin", "admin", "moderator"] },
-    { id: "categories", label: "Categories", symbol: "▦", roles: ["super_admin"] },
-    { id: "sections", label: "Homepage sections", symbol: "▣", roles: ["super_admin"] },
-    { id: "settings", label: "Site settings", symbol: "⚙", roles: ["super_admin"] },
-    { id: "users", label: "Users", symbol: "♙", roles: ["super_admin", "admin"] },
+    { id: "dashboard", label: "Dashboard", group: "Overview", symbol: "⌂", roles: ["super_admin", "admin", "moderator"] },
+    { id: "articles", label: "New Post / Edit Posts", group: "Posts / Articles", symbol: "▤", roles: ["super_admin", "admin", "moderator"] },
+    { id: "drafts", label: "Drafts", group: "Posts / Articles", symbol: "◷", roles: ["super_admin", "admin", "moderator"] },
+    { id: "top-news", label: "Top News", group: "Editorial", symbol: "★", roles: ["super_admin"] },
+    { id: "recent", label: "Recent", group: "Editorial", symbol: "◷", roles: ["super_admin"] },
+    { id: "breaking", label: "Breaking", group: "Editorial", symbol: "!", roles: ["super_admin"] },
+    { id: "popular", label: "Popular", group: "Editorial", symbol: "↗", roles: ["super_admin"] },
+    { id: "special", label: "Special", group: "Editorial", symbol: "✦", roles: ["super_admin"] },
+    { id: "categories", label: "Categories", group: "Editorial", symbol: "▦", roles: ["super_admin"] },
+    { id: "editors", label: "Editors", group: "Editorial", symbol: "♙", roles: ["super_admin", "admin"] },
+    { id: "writings", label: "Writings", group: "Content", symbol: "✎", roles: ["super_admin"] },
+    { id: "ads", label: "Ads", group: "Content", symbol: "▧", roles: ["super_admin"] },
+    { id: "header", label: "Header", group: "Appearance", symbol: "⌃", roles: ["super_admin"] },
+    { id: "sections", label: "Layout", group: "Appearance", symbol: "▣", roles: ["super_admin"] },
+    { id: "footer", label: "Footer", group: "Appearance", symbol: "⌄", roles: ["super_admin"] },
+    { id: "social", label: "Social", group: "Appearance", symbol: "◎", roles: ["super_admin"] },
+    { id: "videos", label: "Videos", group: "Media", symbol: "▷", roles: ["super_admin", "admin", "moderator"] },
+    { id: "users", label: "Users", group: "Administration", symbol: "♙", roles: ["super_admin", "admin"] },
+    { id: "settings", label: "Site Settings", group: "Administration", symbol: "⚙", roles: ["super_admin"] },
+    { id: "profile", label: "Profile · Avatar & Password", group: "Account", symbol: "●", roles: ["super_admin", "admin", "moderator"] },
   ];
 
   const loginPanel = document.querySelector("#login-panel");
@@ -142,15 +155,13 @@
   }
 
   function renderNavigation() {
-    nav.innerHTML = navigation
-      .filter((item) => item.roles.includes(state.user.role))
-      .map((item) => `
+    const allowed = navigation.filter((item) => item.roles.includes(state.user.role));
+    const groups = [...new Set(allowed.map((item) => item.group))];
+    nav.innerHTML = groups.map((group) => `
+      <div class="nav-group"><p class="sidebar-label">${group}</p>${allowed.filter((item) => item.group === group).map((item) => `
         <a href="#${item.id}" data-view="${item.id}" ${state.view === item.id ? 'aria-current="page"' : ""}>
-          <span class="nav-symbol" aria-hidden="true">${item.symbol}</span>
-          <span>${item.label}</span>
-        </a>
-      `)
-      .join("");
+          <span class="nav-symbol" aria-hidden="true">${item.symbol}</span><span>${item.label}</span>
+        </a>`).join("")}</div>`).join("");
   }
 
   function setHeading(title, description = "", action = "") {
@@ -185,12 +196,16 @@
     pageContent.innerHTML = `<div class="empty-panel">${emptyPanel("Loading…")}</div>`;
     try {
       if (view === "dashboard") await renderDashboard();
-      if (view === "articles") await renderArticles();
+      if (view === "articles") { state.articleFilters = {}; state.articleOffset = 0; await renderArticles(); }
+      if (view === "drafts") { state.articleFilters = { status: "draft" }; state.articleOffset = 0; await renderArticles(); }
       if (view === "videos") await renderVideos();
       if (view === "categories") await renderCategories();
       if (view === "sections") await renderSections();
-      if (view === "settings") await renderSettings();
-      if (view === "users") await renderUsers();
+      if (view === "settings" || view === "header" || view === "footer" || view === "social") await renderSettings(view);
+      if (view === "users" || view === "editors") await renderUsers(view === "editors");
+      if (["top-news", "recent", "breaking", "popular", "special"].includes(view)) await renderPlacement(view);
+      if (view === "writings" || view === "ads") await renderContentModule(view);
+      if (view === "profile") await renderProfile();
     } catch (error) {
       pageContent.innerHTML = `<div class="empty-panel">${emptyPanel(escapeHtml(error.message))}</div>`;
       showToast(error.message, true);
@@ -799,6 +814,71 @@
       } catch (error) {
         showToast(error.message, true);
       }
+    });
+  }
+
+
+  const placementNames = {"top-news":"top",recent:"recent",breaking:"breaking",popular:"popular",special:"special"};
+  async function renderPlacement(view) {
+    const placement=placementNames[view];
+    const [{articles:current},{articles:available}]=await Promise.all([
+      request(`/api/admin/placements/${placement}`),
+      request("/api/admin/articles?status=published&limit=100"),
+    ]);
+    const selected=new Set(current.map(item=>item.id));
+    pageContent.innerHTML=`
+      ${setHeading(({ "top-news":"Top News",recent:"Recent",breaking:"Breaking",popular:"Popular",special:"Special"})[view],"Select published articles and save their display order.")}
+      <form id="placement-form" class="panel section-card stack-form">
+        <div class="article-checklist">${available.map(item=>`<label><input type="checkbox" name="articleIds" value="${item.id}" ${selected.has(item.id)?"checked":""}><span><strong>${escapeHtml(item.headline||item.title)}</strong><small>${escapeHtml(item.slug)}</small></span></label>`).join("")||emptyPanel("Publish articles first.")}</div>
+        <div class="form-actions"><button class="button button-primary" type="submit">Save selection</button></div>
+      </form>`;
+    document.querySelector("#placement-form").addEventListener("submit",async event=>{
+      event.preventDefault(); const articleIds=[...new FormData(event.currentTarget).getAll("articleIds")];
+      try{await request(`/api/admin/placements/${placement}`,{method:"PUT",body:JSON.stringify({articleIds})});showToast("Editorial selection saved.");}
+      catch(error){showToast(error.message,true);}
+    });
+  }
+
+  async function renderContentModule(module) {
+    const {entries}=await request(`/api/admin/content/${module}`);
+    const title=module==="ads"?"Ads":"Writings";
+    const rows=entries.map(entry=>`<tr><td><strong>${escapeHtml(entry.title)}</strong><small>${escapeHtml(entry.content||"")}</small></td><td>${escapeHtml(entry.placement||"—")}</td><td>${entry.is_enabled?"Enabled":"Disabled"}</td><td><div class="row-actions"><button class="button button-secondary" data-action="edit-content" data-id="${entry.id}">Edit</button><button class="button button-danger" data-action="delete-content" data-id="${entry.id}">Delete</button></div></td></tr>`).join("");
+    pageContent.innerHTML=`${setHeading(title,module==="ads"?"Manage ad creatives, links and placements.":"Manage editorial writings and opinion pieces.",'<button class="button button-primary" data-action="new-content">＋ Add entry</button>')}<div class="table-panel"><div class="table-scroll"><table><thead><tr><th>Entry</th><th>Placement</th><th>Status</th><th>Actions</th></tr></thead><tbody>${rows||'<tr><td colspan="4">No entries yet.</td></tr>'}</tbody></table></div></div>`;
+  }
+
+  async function openContentEditor(module,id="") {
+    const {entries}=await request(`/api/admin/content/${module}`); const entry=entries.find(item=>item.id===id);
+    openModal(entry?"Edit entry":"Add entry",`<form id="content-entry-form" class="stack-form">
+      <label>Title<input name="title" maxlength="180" required value="${escapeHtml(entry?.title||"")}"></label>
+      <label>Content / description<textarea name="content" rows="5" maxlength="20000">${escapeHtml(entry?.content||"")}</textarea></label>
+      <label>Target URL<input name="targetUrl" type="url" maxlength="1000" value="${escapeHtml(entry?.target_url||"")}"></label>
+      <label>Image URL<input name="imageUrl" type="url" maxlength="1000" value="${escapeHtml(entry?.image_url||"")}"></label>
+      <label>Placement<input name="placement" maxlength="80" placeholder="e.g. homepage, sidebar, article-inline" value="${escapeHtml(entry?.placement||"")}"></label>
+      <label>Display order<input name="sortOrder" type="number" min="0" max="10000" value="${entry?.sort_order??0}"></label>
+      <label class="inline-toggle"><input name="isEnabled" type="checkbox" ${entry?.is_enabled!==false?"checked":""}><span class="toggle-track"></span> Enabled</label>
+      <div class="form-actions"><button type="button" class="button button-secondary" data-action="close-modal">Cancel</button><button class="button button-primary" type="submit">Save</button></div>
+    </form>`);
+    document.querySelector("#content-entry-form").addEventListener("submit",async event=>{
+      event.preventDefault();const form=event.currentTarget;
+      const body={title:form.elements.title.value,content:form.elements.content.value,targetUrl:form.elements.targetUrl.value,imageUrl:form.elements.imageUrl.value,placement:form.elements.placement.value,sortOrder:Number(form.elements.sortOrder.value),isEnabled:form.elements.isEnabled.checked};
+      try{await request(id?`/api/admin/content/${module}/${id}`:`/api/admin/content/${module}`,{method:id?"PATCH":"POST",body:JSON.stringify(body)});closeModal();showToast("Entry saved.");await renderContentModule(module);}
+      catch(error){showToast(error.message,true);}
+    });
+  }
+
+  async function renderProfile() {
+    const {profile}=await request("/api/admin/profile");
+    pageContent.innerHTML=`${setHeading("Profile","Update your newsroom account and password.")}<form id="profile-form" class="panel section-card stack-form"><div class="form-grid">
+      <label>Username<input name="username" minlength="3" maxlength="48" required value="${escapeHtml(profile.username)}"></label>
+      <label>Email<input name="email" type="email" required value="${escapeHtml(profile.email)}"></label>
+      <label>Current password (only required to change password)<input name="currentPassword" type="password" autocomplete="current-password"></label>
+      <label>New password<input name="newPassword" type="password" minlength="12" maxlength="72" autocomplete="new-password"></label>
+    </div><p class="form-help">New passwords must contain at least 12 characters. Avatar upload is not configured in the current media model.</p><div class="form-actions"><button class="button button-primary" type="submit">Save profile</button></div></form>`;
+    document.querySelector("#profile-form").addEventListener("submit",async event=>{
+      event.preventDefault();const form=event.currentTarget;const body={username:form.elements.username.value,email:form.elements.email.value};
+      if(form.elements.currentPassword.value||form.elements.newPassword.value){body.currentPassword=form.elements.currentPassword.value;body.newPassword=form.elements.newPassword.value;}
+      try{await request("/api/admin/profile",{method:"PATCH",body:JSON.stringify(body)});showToast("Profile updated.");}
+      catch(error){showToast(error.message,true);}
     });
   }
 
