@@ -877,11 +877,12 @@
     pageContent.innerHTML=`${setHeading("Profile","Update your newsroom account and password.")}<form id="profile-form" class="panel section-card stack-form"><div class="form-grid">
       <label>Username<input name="username" minlength="3" maxlength="48" required value="${escapeHtml(profile.username)}"></label>
       <label>Email<input name="email" type="email" required value="${escapeHtml(profile.email)}"></label>
+      <label class="full-width">Avatar image URL (HTTPS)<input name="avatarUrl" type="url" placeholder="https://…" value="${escapeHtml(profile.avatar_url||"")}"></label>
       <label>Current password (only required to change password)<input name="currentPassword" type="password" autocomplete="current-password"></label>
       <label>New password<input name="newPassword" type="password" minlength="12" maxlength="72" autocomplete="new-password"></label>
     </div><p class="form-help">New passwords must contain at least 12 characters. Avatar upload is not configured in the current media model.</p><div class="form-actions"><button class="button button-primary" type="submit">Save profile</button></div></form>`;
     document.querySelector("#profile-form").addEventListener("submit",async event=>{
-      event.preventDefault();const form=event.currentTarget;const body={username:form.elements.username.value,email:form.elements.email.value};
+      event.preventDefault();const form=event.currentTarget;const body={username:form.elements.username.value,email:form.elements.email.value,avatarUrl:form.elements.avatarUrl.value};
       if(form.elements.currentPassword.value||form.elements.newPassword.value){body.currentPassword=form.elements.currentPassword.value;body.newPassword=form.elements.newPassword.value;}
       try{await request("/api/admin/profile",{method:"PATCH",body:JSON.stringify(body)});showToast("Profile updated.");}
       catch(error){showToast(error.message,true);}
