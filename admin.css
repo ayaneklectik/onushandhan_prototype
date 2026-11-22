@@ -965,3 +965,5 @@ textarea {
 .article-rich-editor:empty::before{content:attr(data-placeholder);color:#999;pointer-events:none}
 .article-rich-editor h2{font-size:1.35em}.article-rich-editor blockquote{margin:14px 0;padding:8px 14px;border-left:3px solid var(--red);background:#faf4f4}
 .article-rich-editor ul,.article-rich-editor ol{padding-left:28px}
+
+.nav-group{margin:0 0 18px}.nav-group .sidebar-label{margin:0 0 7px;padding:0 12px}.nav-group a{margin-bottom:3px}
