@@ -17,7 +17,7 @@ CREATE INDEX IF NOT EXISTS admin_content_entries_module_idx
 
 CREATE TABLE IF NOT EXISTS article_placements (
   article_id UUID NOT NULL REFERENCES articles(id) ON DELETE CASCADE,
-  placement TEXT NOT NULL CHECK (placement IN ('recent', 'breaking', 'popular', 'special')),
+  placement TEXT NOT NULL CHECK (placement IN ('top', 'recent', 'breaking', 'popular', 'special')),
   sort_order INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   PRIMARY KEY (article_id, placement)
