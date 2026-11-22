@@ -314,6 +314,19 @@
     return section;
   }
 
+  function placementBlock(title, items, className = "") {
+    if (!items?.length) return null;
+    const section=document.createElement("section");
+    section.className=`homepage-section editorial-placement ${className}`;
+    const heading=document.createElement("div"); heading.className="section-heading";
+    const label=document.createElement("h2"); label.textContent=title;
+    const rule=document.createElement("span"); rule.className="heading-rule"; rule.setAttribute("aria-hidden","true");
+    heading.append(label,rule); section.append(heading);
+    const list=document.createElement("div"); list.className="news-list";
+    items.forEach(article=>list.append(articleCard(article)));
+    section.append(list); return section;
+  }
+
   function homePage(data, articles) {
     document.body.classList.add("is-home");
     contentLayout.classList.add("is-home-layout");
@@ -352,6 +365,18 @@
       leadGrid.append(live);
     }
     homeLayout.append(leadGrid);
+
+    const placementLabels = [
+      ["top", "শীর্ষ সংবাদ", "is-top-news"],
+      ["breaking", "ব্রেকিং নিউজ", "is-breaking"],
+      ["popular", "জনপ্রিয় সংবাদ", "is-popular"],
+      ["special", "বিশেষ প্রতিবেদন", "is-special"],
+      ["recent", "সাম্প্রতিক", "is-recent"],
+    ];
+    placementLabels.forEach(([key,label,className]) => {
+      const block=placementBlock(label,data.placements?.[key],className);
+      if(block) homeLayout.append(block);
+    });
 
     const lower = document.createElement("div");
     lower.className = "home-lower-grid";
