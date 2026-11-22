@@ -1,170 +1,109 @@
 # অনুসন্ধান newsroom
 
-The public website and administration panel are served by the same Node.js process. PostgreSQL stores content, accounts, sessions, permissions, settings, and activity; article images are held in S3-compatible object storage. Videos are added as YouTube links.
+A newsroom website and administration system deployed as three separate Dockploy services:
 
-## Requirements
+- **Frontend** — Nginx serves the public website and admin panel.
+- **Backend** — Node.js/Express API, authentication, uploads and business logic.
+- **PostgreSQL** — persistent application database.
 
-- Node.js 20 or newer
-- PostgreSQL 13 or newer
-- An S3-compatible bucket for public article images
-- A same-origin HTTPS deployment for production
+The frontend proxies requests under `/api` and `/healthz` to the backend over the private Docker network. The browser therefore uses one origin for the site and API, preserving the existing session-cookie and CSRF model. Article images are stored in S3-compatible object storage (Cloudflare R2 recommended); they are not stored in the container.
 
-## First-time setup
+## Deploy with Dockploy
 
-1. Create a PostgreSQL database and copy `.env.example` to `.env`.
-2. Set `DATABASE_URL` and generate a unique session key, for example:
+Deploy the repository's **main** branch as a Docker Compose application, using the root `compose.yaml`. Do not create three independent Git deployments from the area-only branches: the Compose file builds all three services from the integrated main branch.
 
-   ```sh
-   openssl rand -hex 32
-   ```
+### Services
 
-3. Configure media storage:
-   - Set `MEDIA_BUCKET`, `MEDIA_REGION`, `MEDIA_ACCESS_KEY_ID`, and `MEDIA_SECRET_ACCESS_KEY`.
-   - Set `MEDIA_ENDPOINT` for S3-compatible providers that need a custom endpoint.
-   - Set `MEDIA_PUBLIC_BASE_URL` to the public base URL/CDN path for objects in the bucket.
-   - In the bucket's CORS policy, allow the deployed website origin to use `POST` with the headers required by S3 POST policies. For local development, also allow `http://localhost:3000`.
-   - Allow public reads only for published site media (or use a public CDN origin); keep credentials private and never put them in browser code.
-4. Install dependencies, apply the schema, and create the first administrator:
+| Dockploy service | Container | Purpose |
+|---|---|---|
+| `frontend` | Nginx | Public website, admin UI, reverse proxy |
+| `backend` | Node.js 22 | API, authentication, media signing, migrations |
+| `postgres` | PostgreSQL 16 | Persistent database |
 
-   ```sh
-   npm install
-   npm run db:migrate
-   npm run admin:create-superadmin
-   ```
+Expose only the frontend service publicly. Configure the Dockploy domain on `frontend` and set its container port to `80`. Keep `backend:3000` and `postgres:5432` private. The compose file creates a persistent `postgres_data` volume.
 
-   The setup command prompts for the initial username, email, and password. It requires a 12-character minimum and refuses to create a second initial Super Admin.
-5. Run the site:
+### Environment variables
 
-   ```sh
-   npm start
-   ```
+Set these in the Dockploy Compose environment:
 
-   Open `http://localhost:3000` for the public site and `http://localhost:3000/admin` for the admin panel.
-
-Migrations are explicit; the server does not silently alter the database at startup. Back up PostgreSQL and object storage before production migrations or deletions.
-
-## Roles enforced by the API
-
-| Capability | Super Admin | Admin | Moderator |
-|---|---:|---:|---:|
-| Dashboard | Full | Full | Own content |
-| Create/edit articles | All | All | Own drafts |
-| Publish/unpublish/delete articles | Yes | Yes | No |
-| Create/edit videos | All | All | Own drafts |
-| Publish/unpublish/delete videos | Yes | Yes | No |
-| Categories, homepage sections, site settings | Yes | No | No |
-| View users / create accounts | Yes | Yes (Moderator only) | No |
-| Change account details, roles, status, passwords | Yes | No | No |
-
-Authorization is checked on every protected API request. Sessions are opaque, signed, stored hashed in PostgreSQL, expire after eight hours, and are invalidated immediately when an account is suspended or its role changes. Mutating API requests require a same-origin `Origin` and CSRF token. Passwords are bcrypt-hashed, login attempts are rate-limited, and the last active Super Admin cannot be suspended or demoted.
-
-Moderators may create content and work on their own drafts; publication and management of other content remain with Admins and Super Admins. The browser hides unavailable controls, but the API also rejects unauthorized requests.
-
-## Operations and production notes
-
-- Set `NODE_ENV=production`, `SESSION_SECRET` to a unique random value, and `MEDIA_PUBLIC_BASE_URL` plus storage credentials. Production startup fails if required secrets/storage settings are missing.
-- Set `DATABASE_SSL=true` when the PostgreSQL provider requires TLS. `TRUST_PROXY=1` is only for a deployment behind a trusted single reverse proxy.
-- Keep the API and frontend on the same origin; cross-origin API access is intentionally not enabled.
-- Configure the object storage CORS policy for direct browser POSTs. Uploads use short-lived signed POST policies with file-size/type limits; the server verifies the completed object before it can be attached to content.
-- Supported uploaded image types are JPEG, PNG, WebP, and AVIF. Video entries require an HTTPS YouTube video link; the public video section loads the YouTube thumbnail and opens an embedded player when visitors press play.
-- `/healthz` checks database connectivity. The server serves only the public website/admin files and does not expose `.env`, migrations, scripts, or dependencies.
-- Published videos appear in the public “ভিডিও পডকাস্ট” category. Published articles appear in the latest/category feeds and article detail pages. Homepage sections and category display/order settings, plus site contact/social settings, are read from persisted records.
-- Super Admins can independently reorder homepage categories and navbar categories from Admin → Categories, and select each category's homepage layout. Layout choices include a featured story with headlines, a large-image headlines layout, an image grid, and headlines only.
-- “ভিডিও পডকাস্ট” is a video-only category: it shows published playable videos, not articles. New articles cannot be assigned to it; existing legacy article assignments are hidden from public news feeds.
-- Admins can update the public Facebook, YouTube, and Instagram destinations from Site settings; blank social URLs hide the corresponding icons. Public-site search matches published article titles, headlines, and summaries.
-
-## Branch workflow
-
-This application is deployed as one Node.js service, so each branch contains the complete working project. Use the branches to group changes by area, then open a pull request into `main` to integrate them.
-
-| Branch | Put changes to these files here |
-|---|---|
-| `frontend` | `index.html`, `article.html`, `admin.html`, `styles.css`, `admin.css`, `app.js`, `article.js`, `admin.js`, `content.js`, and public image/assets |
-| `backend` | `server/` and `scripts/` |
-| `database` | `migrations/` and database-specific changes in `server/db.js` |
-
-Create and publish a branch from the latest `main`:
-
-```sh
-git switch main
-git pull origin main
-git switch -c frontend
-# Make and commit only frontend changes
-git add index.html article.html admin.html styles.css admin.css app.js article.js admin.js content.js
-git commit -m "Describe frontend change"
-git push -u origin frontend
+```dotenv
+FRONTEND_PORT=8080
+POSTGRES_DB=onusondhan
+POSTGRES_USER=onusondhan
+POSTGRES_PASSWORD=use-a-strong-url-safe-password
+DATABASE_URL=postgres://onusondhan:use-a-strong-url-safe-password@postgres:5432/onusondhan
+SESSION_SECRET=generate-at-least-32-random-characters
+MEDIA_ENDPOINT=https://YOUR_CLOUDFLARE_ACCOUNT_ID.r2.cloudflarestorage.com
+MEDIA_REGION=auto
+MEDIA_BUCKET=your-r2-bucket
+MEDIA_ACCESS_KEY_ID=your-r2-access-key-id
+MEDIA_SECRET_ACCESS_KEY=your-r2-secret-access-key
+MEDIA_PUBLIC_BASE_URL=https://your-public-media-domain
+MEDIA_FORCE_PATH_STYLE=false
+MEDIA_MAX_IMAGE_BYTES=10485760
 ```
 
-For backend work, create the branch from `main` and stage the server and operational scripts:
+Use a URL-safe PostgreSQL password in `DATABASE_URL` (or percent-encode reserved characters). Generate the session secret with `openssl rand -hex 32`. Keep all credentials in Dockploy environment settings, never in Git. The R2 public base URL must point to the public bucket/CDN hostname used to serve uploaded images. Configure R2 CORS to allow the deployed website origin to send browser `PUT` uploads with the required content-type header.
+
+### Startup and health checks
+
+- PostgreSQL becomes healthy after `pg_isready` succeeds.
+- Backend waits for PostgreSQL, applies unapplied SQL migrations, then starts Express on port `3000`.
+- Frontend waits for a healthy backend and serves on port `80`.
+- Dockploy should monitor frontend port `80`; its `/healthz` route is proxied to the backend and checks database connectivity.
+
+The backend migration runner tracks applied filenames in `schema_migrations`; existing migration files are not reapplied. Back up the database before deploying schema changes.
+
+### First administrator
+
+After all services are healthy, run this one-off command in the backend container:
 
 ```sh
-git switch main
-git pull origin main
-git switch -c backend
-git add server/ scripts/
-git commit -m "Describe backend change"
-git push -u origin backend
+npm run admin:create-superadmin
 ```
 
-For database work, stage migrations and database-specific connection changes:
+It prompts for the initial username, email and password. The password must be at least 12 characters. The command refuses to create a second initial Super Admin. The admin panel is available at `/admin` on the frontend domain.
+
+## Local deployment test
+
+Copy `.env.example` to `.env`, set the values above (including `DATABASE_URL=postgres://onusondhan:...@postgres:5432/onusondhan`), then run:
 
 ```sh
-git switch main
-git pull origin main
-git switch -c database
-git add migrations/ server/db.js
-git commit -m "Describe database change"
-git push -u origin database
+docker compose up --build -d
+docker compose ps
+docker compose logs -f backend
 ```
 
-For later work on an existing branch, use `git switch <branch>` instead of `git switch -c <branch>`, then pull and push that branch. Keep `.env` local; commit `.env.example` only when changing the documented configuration template. Open a pull request from the work branch into `main` when the change is ready.
+Open the frontend on port `8080` (or the configured `FRONTEND_PORT`). For a production Dockploy deployment, configure its public domain and TLS on the frontend service.
 
-## Checks
+## Development
 
-```sh
-npm run check
-```
-
-The repository does not include production credentials or a database/object-storage service. Run migrations and perform end-to-end account/content checks against the PostgreSQL and bucket configured for your deployment before opening the panel to staff.
-
-## Test article content
-
-To populate every enabled article category with 10 clearly labelled demo articles and eight reusable sample illustrations uploaded to the configured S3-compatible bucket (Cloudflare R2 in production), run:
+Requirements: Node.js 20+, PostgreSQL 13+ and an S3-compatible media bucket.
 
 ```sh
+npm ci
 npm run db:migrate
-npm run seed:test-articles
+npm run admin:create-superadmin
+npm start
 ```
 
-The video-only category is excluded. The seed is tracked in dedicated database tables and refuses to create a second batch while a tracked batch exists. To remove only seeded demo articles and their unreferenced demo images, run:
+Run checks with `npm run check` and tests with `npm test`.
 
-```sh
-npm run seed:remove-test-articles
-```
+## Branch responsibilities
 
-Images still referenced by other articles or videos are preserved. Back up the database and bucket before cleanup. Demo articles are published for frontend testing and are visibly labelled as test content; do not leave them on a public production site.
+- `main`: integrated deployable application and Compose orchestration.
+- `frontend`: static public/admin UI, Nginx configuration and frontend image.
+- `backend`: API, backend runtime image and operational scripts.
+- `database`: SQL migrations and migration runner.
 
+Make area-specific changes on their respective branches, then integrate them into `main` before deploying the Compose stack. The database itself is a runtime PostgreSQL service; the `database` branch contains schema and migration code, not a second application container.
 
-## Deploying with Dockploy
+## Security and operations
 
-This repository includes a root-level `Dockerfile`. In Dockploy, create an application from this Git repository, select the branch you want to deploy, and use the Dockerfile build option. The container runs pending SQL migrations before starting the Express server.
-
-Provision PostgreSQL separately (Dockploy database service or managed PostgreSQL) and configure these application environment variables:
-
-- `NODE_ENV=production`
-- `PORT=3000`
-- `DATABASE_URL` — PostgreSQL connection string
-- `SESSION_SECRET` — at least 32 random characters
-- `TRUST_PROXY=1` when deployed behind Dockploy's reverse proxy
-- `MEDIA_BUCKET`
-- `MEDIA_ACCESS_KEY_ID`
-- `MEDIA_SECRET_ACCESS_KEY`
-- `MEDIA_PUBLIC_BASE_URL`
-- `MEDIA_ENDPOINT` and `MEDIA_REGION` for the S3-compatible provider (Cloudflare R2 uses its account S3 endpoint and region `auto`)
-- `MEDIA_FORCE_PATH_STYLE=false` for Cloudflare R2
-
-The service listens on the configured `PORT` and exposes `/healthz` for container health checks. Persistent media belongs in the configured S3-compatible bucket, not the container filesystem. Keep PostgreSQL and media credentials in Dockploy environment settings; never commit them.
-
-After the first deployment, create the initial Super Admin using the one-off command `npm run admin:create-superadmin` in the application container. The admin interface is available at `/admin`.
-
-Migrations are applied automatically at container startup. Take a database backup before deploying schema changes to an existing production database.
+- Only the frontend should have a public domain/port. Do not publish backend or PostgreSQL ports.
+- Keep PostgreSQL data in the named persistent volume and schedule backups.
+- Keep R2 and database credentials private. Rotate any credentials that have been exposed.
+- Set `TRUST_PROXY=1` because Express is behind the frontend reverse proxy.
+- Set `MEDIA_FORCE_PATH_STYLE=false` for Cloudflare R2.
+- The app serves all API requests from the same public origin; do not configure browser CORS or point frontend JavaScript directly at an internal backend hostname.
+- The video-only category contains YouTube video links; uploaded article images are stored in R2.
