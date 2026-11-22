@@ -184,6 +184,10 @@ api.get("/public/site", async (_req, res) => {
      JOIN users u ON u.id=a.author_id LEFT JOIN categories c ON c.id=a.category_id
      WHERE a.status='published' ORDER BY p.placement,p.sort_order`,
   );
+  const contentEntriesResult = await pool.query(
+    `SELECT module, title, content, target_url, image_url, placement, sort_order
+     FROM admin_content_entries WHERE is_enabled=true ORDER BY sort_order,created_at DESC`,
+  );
   const videosResult = await pool.query(
     `SELECT id, title, description, source_type, external_url, object_key, thumbnail_key, published_at
      FROM videos WHERE status = 'published' ORDER BY published_at DESC LIMIT 12`,
@@ -208,6 +212,7 @@ api.get("/public/site", async (_req, res) => {
     categories: categoriesResult.rows,
     articles,
     placements: placementsResult.rows.reduce((groups, article) => { const item = { ...article, image: mediaUrl(article.image_key) }; (groups[item.placement] ||= []).push(item); return groups; }, {}),
+    contentEntries: contentEntriesResult.rows,
     sections,
     videos: videosResult.rows.map((video) => {
       const videoId = video.external_url ? youtubeVideoId(video.external_url) : null;
