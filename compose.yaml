@@ -1,0 +1,81 @@
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+    networks:
+      - app
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1/healthz || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      TRUST_PROXY: "1"
+      DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL to the PostgreSQL service connection string}
+      SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET to a random value of at least 32 characters}
+      MEDIA_ENDPOINT: ${MEDIA_ENDPOINT:-}
+      MEDIA_REGION: ${MEDIA_REGION:-auto}
+      MEDIA_BUCKET: ${MEDIA_BUCKET:?Set MEDIA_BUCKET}
+      MEDIA_ACCESS_KEY_ID: ${MEDIA_ACCESS_KEY_ID:?Set MEDIA_ACCESS_KEY_ID}
+      MEDIA_SECRET_ACCESS_KEY: ${MEDIA_SECRET_ACCESS_KEY:?Set MEDIA_SECRET_ACCESS_KEY}
+      MEDIA_PUBLIC_BASE_URL: ${MEDIA_PUBLIC_BASE_URL:?Set MEDIA_PUBLIC_BASE_URL}
+      MEDIA_FORCE_PATH_STYLE: ${MEDIA_FORCE_PATH_STYLE:-false}
+      MEDIA_MAX_IMAGE_BYTES: ${MEDIA_MAX_IMAGE_BYTES:-10485760}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    expose:
+      - "3000"
+    networks:
+      - app
+      - data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 45s
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-onusondhan}
+      POSTGRES_USER: ${POSTGRES_USER:-onusondhan}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    expose:
+      - "5432"
+    networks:
+      - data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-onusondhan} -d ${POSTGRES_DB:-onusondhan}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+volumes:
+  postgres_data:
+
+networks:
+  app:
+  data:
+    internal: true
