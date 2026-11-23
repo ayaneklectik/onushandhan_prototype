@@ -20,7 +20,7 @@ try {
       applied_at TIMESTAMPTZ NOT NULL DEFAULT now()
     )
   `);
-  const files = (await readdir(directory)).filter((file) => /^\\d+_.+\\.sql$/.test(file)).sort();
+  const files = (await readdir(directory)).filter((file) => /^\d+_.+\.sql$/.test(file)).sort();
   for (const filename of files) {
     const historicalName = historicalNames[filename];
     const alreadyApplied = await client.query(
