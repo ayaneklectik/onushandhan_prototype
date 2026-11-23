@@ -49,7 +49,7 @@ Use a URL-safe PostgreSQL password in `DATABASE_URL` (or percent-encode reserved
 The checked-in Railway snapshot is a PostgreSQL 18.7 plain SQL dump. Restore it into a fresh PostgreSQL 18 database before enabling automatic migrations. Do not restore into a database that already contains application tables.
 
 1. Deploy the Compose stack with `AUTO_MIGRATE=false` and the required database and R2 environment variables. The backend can start without running migrations; its health endpoint only checks database connectivity.
-2. Wait for PostgreSQL to become healthy. Restore the separately secured SQL dump into the `postgres` service using `psql` (for example, `docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" < railway_backup.sql`, from a trusted shell with the dump available). Do not commit or upload the dump to the public repository.
+2. Wait for PostgreSQL to become healthy. Restore the separately secured SQL dump into the `postgres` service using `psql` (for example, `docker compose exec -T postgres sh -c 'exec psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < /secure/path/railway_backup.sql`, from a trusted shell with the dump available). Do not commit or upload the dump to the public repository.
 3. Verify the restored tables, article counts, users, and the `schema_migrations` rows for migrations 001–008 before allowing public traffic.
 4. Set `AUTO_MIGRATE=true` and redeploy/restart the backend. The migration runner recognizes the historical `001_initial.sql` ledger name and will not replay the initial schema.
 5. Confirm `/healthz`, public pages, admin login, article images and R2 upload before announcing the site.
