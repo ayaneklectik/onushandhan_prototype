@@ -18,16 +18,15 @@ Deploy the repository's **main** branch as a Docker Compose application, using t
 |---|---|---|
 | `frontend` | Nginx | Public website, admin UI, reverse proxy |
 | `backend` | Node.js 22 | API, authentication, media signing, migrations |
-| `postgres` | PostgreSQL 16 | Persistent database |
+| `postgres` | PostgreSQL 18 | Persistent database |
 
-Expose only the frontend service publicly. Configure the Dockploy domain on `frontend` and set its container port to `80`. Keep `backend:3000` and `postgres:5432` private. The compose file creates a persistent `postgres_data` volume.
+Expose only the frontend service publicly. Configure the Dockploy domain on `frontend` and set its container port to `80`. The frontend uses Compose `expose: 80` and has no host port binding. Keep `backend:3000` and `postgres:5432` private. The compose file creates a persistent `postgres_data` volume.
 
 ### Environment variables
 
 Set these in the Dockploy Compose environment:
 
 ```dotenv
-FRONTEND_PORT=8080
 POSTGRES_DB=onusondhan
 POSTGRES_USER=onusondhan
 POSTGRES_PASSWORD=use-a-strong-url-safe-password
@@ -45,10 +44,22 @@ MEDIA_MAX_IMAGE_BYTES=10485760
 
 Use a URL-safe PostgreSQL password in `DATABASE_URL` (or percent-encode reserved characters). Generate the session secret with `openssl rand -hex 32`. Keep all credentials in Dockploy environment settings, never in Git. The R2 public base URL must point to the public bucket/CDN hostname used to serve uploaded images. Configure R2 CORS to allow the deployed website origin to send browser `PUT` uploads with the required content-type header.
 
+### Restore the Railway database before enabling migrations
+
+The checked-in Railway snapshot is a PostgreSQL 18.7 plain SQL dump. Restore it into a fresh PostgreSQL 18 database before enabling automatic migrations. Do not restore into a database that already contains application tables.
+
+1. Deploy the Compose stack with `AUTO_MIGRATE=false` and the required database and R2 environment variables. The backend can start without running migrations; its health endpoint only checks database connectivity.
+2. Wait for PostgreSQL to become healthy. Restore the separately secured SQL dump into the `postgres` service using `psql` (for example, `docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" < railway_backup.sql`, from a trusted shell with the dump available). Do not commit or upload the dump to the public repository.
+3. Verify the restored tables, article counts, users, and the `schema_migrations` rows for migrations 001–008 before allowing public traffic.
+4. Set `AUTO_MIGRATE=true` and redeploy/restart the backend. The migration runner recognizes the historical `001_initial.sql` ledger name and will not replay the initial schema.
+5. Confirm `/healthz`, public pages, admin login, article images and R2 upload before announcing the site.
+
+Always take a backup before schema changes. Never restore the same dump over an already-populated database.
+
 ### Startup and health checks
 
 - PostgreSQL becomes healthy after `pg_isready` succeeds.
-- Backend waits for PostgreSQL, applies unapplied SQL migrations, then starts Express on port `3000`.
+- Backend waits for PostgreSQL, optionally applies unapplied SQL migrations when `AUTO_MIGRATE=true`, then starts Express on port `3000`.
 - Frontend waits for a healthy backend and serves on port `80`.
 - Dockploy should monitor frontend port `80`; its `/healthz` route is proxied to the backend and checks database connectivity.
 
@@ -74,11 +85,11 @@ docker compose ps
 docker compose logs -f backend
 ```
 
-Open the frontend on port `8080` (or the configured `FRONTEND_PORT`). For a production Dockploy deployment, configure its public domain and TLS on the frontend service.
+For a production Dockploy deployment, configure its public domain and TLS on the frontend service (container port `80`).
 
 ## Development
 
-Requirements: Node.js 20+, PostgreSQL 13+ and an S3-compatible media bucket.
+Requirements: Node.js 20+, PostgreSQL 18 and an S3-compatible media bucket.
 
 ```sh
 npm ci
