@@ -7,8 +7,8 @@ services:
     depends_on:
       backend:
         condition: service_healthy
-    ports:
-      - "127.0.0.1:${FRONTEND_PORT:-8080}:80"
+    expose:
+      - "80"
     networks:
       - app
     healthcheck:
@@ -27,6 +27,7 @@ services:
       NODE_ENV: production
       PORT: 3000
       TRUST_PROXY: "1"
+      AUTO_MIGRATE: ${AUTO_MIGRATE:-true}
       DATABASE_URL: ${DATABASE_URL:?Set DATABASE_URL to the PostgreSQL service connection string}
       SESSION_SECRET: ${SESSION_SECRET:?Set SESSION_SECRET to a random value of at least 32 characters}
       MEDIA_ENDPOINT: ${MEDIA_ENDPOINT:-}
@@ -53,7 +54,7 @@ services:
       start_period: 45s
 
   postgres:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-onusondhan}
