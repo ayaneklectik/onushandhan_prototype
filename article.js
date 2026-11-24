@@ -112,6 +112,44 @@
       const { article } = await articleResponse.json();
       const siteName = siteSettings.site_name || "অনুসন্ধান";
       document.title = `${siteName} | ${article.title}`;
+      const description = article.summary || article.headline || article.title;
+      const setMeta = (selector, content, attribute = "content") => {
+        let element = document.head.querySelector(selector);
+        if (!element) {
+          element = document.createElement("meta");
+          const [key, value] = selector.match(/\[(name|property)="([^"]+)"\]/).slice(1);
+          element.setAttribute(key, value);
+          document.head.append(element);
+        }
+        element.setAttribute(attribute, content || "");
+      };
+      setMeta('meta[name="description"]', description);
+      setMeta('meta[property="og:title"]', article.title);
+      setMeta('meta[property="og:description"]', description);
+      if (article.image) setMeta('meta[property="og:image"]', article.image);
+      let canonical = document.head.querySelector('link[rel="canonical"]');
+      if (!canonical) {
+        canonical = document.createElement("link");
+        canonical.rel = "canonical";
+        document.head.append(canonical);
+      }
+      canonical.href = `${location.origin}/news/${encodeURIComponent(article.slug)}`;
+      let structured = document.head.querySelector('script[type="application/ld+json"]');
+      if (!structured) {
+        structured = document.createElement("script");
+        structured.type = "application/ld+json";
+        document.head.append(structured);
+      }
+      structured.textContent = JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "NewsArticle",
+        headline: article.headline || article.title,
+        description,
+        datePublished: article.published_at,
+        image: article.image || undefined,
+        publisher: { "@type": "Organization", name: siteName },
+        mainEntityOfPage: canonical.href,
+      });
       const category = document.createElement("a");
       category.className = "article-category";
       category.href = article.category ? `/category/${encodeURIComponent(article.category)}` : "/news";
