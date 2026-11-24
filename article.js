@@ -123,18 +123,11 @@
       summary.textContent = article.summary;
       const meta = document.createElement("p");
       meta.className = "article-meta";
-      meta.textContent = `${article.author} · ${new Intl.DateTimeFormat("bn-BD", {
+      meta.textContent = new Intl.DateTimeFormat("bn-BD", {
         dateStyle: "long",
         timeStyle: "short",
-      }).format(new Date(article.published_at))}`;
-      const elements = [category, title];
-      if (article.attribution) {
-        const attribution = document.createElement("p");
-        attribution.className = "article-attribution";
-        attribution.textContent = article.attribution;
-        elements.push(attribution);
-      }
-      elements.push(meta);
+      }).format(new Date(article.published_at));
+      const elements = [category, title, meta];
       if (article.summary) elements.push(summary);
       if (article.image) {
         const image = document.createElement("img");
