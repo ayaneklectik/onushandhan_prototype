@@ -431,7 +431,7 @@
         </div>
       </form>
       </section>
-    `);
+    `;
     const form = document.querySelector("#article-editor");
     const richEditor = form.querySelector("#article-body-editor");
     const bodyField = form.elements.body;
