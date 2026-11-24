@@ -304,7 +304,7 @@
       `;
     }).join("");
     pageContent.innerHTML = `
-      ${setHeading("Manage All News", `${data.total} article${data.total === 1 ? "" : "s"} in this view.`)}
+      ${setHeading("Manage All News", `${data.total} article${data.total === 1 ? "" : "s"} in this view.`, '<button class="button button-primary" data-action="new-article">＋ Create New Article</button>')}
       <form id="article-filters" class="filters">
         <input name="q" aria-label="Search articles" placeholder="Search title or headline" value="${escapeHtml(state.articleFilters.q || "")}">
         <select name="status" aria-label="Filter by status">
