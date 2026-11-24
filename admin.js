@@ -1,4 +1,16 @@
 (() => {
+  // Credentials must never be accepted from or retained in URL query strings.
+  const cleanUrl = new URL(window.location.href);
+  let removedSensitiveParams = false;
+  for (const key of [...cleanUrl.searchParams.keys()]) {
+    if (/^(username|user|email|password|passwd|pwd|token|access_token)$/i.test(key)) {
+      cleanUrl.searchParams.delete(key);
+      removedSensitiveParams = true;
+    }
+  }
+  if (removedSensitiveParams) {
+    window.history.replaceState(null, "", cleanUrl.pathname + cleanUrl.search + cleanUrl.hash);
+  }
   const state = {
     user: null,
     csrfToken: "",
