@@ -18,7 +18,7 @@ All three services must run on the same Dokploy server and share a Docker networ
 
 Create a Dokploy **Database → PostgreSQL** service:
 
-- Service name / internal hostname: `postgres`
+- Use the **Internal Host** and **Internal Connection URL** shown in the PostgreSQL service's General tab. The hostname may be generated from the Dokploy service name; copy the displayed value exactly.
 - Version: PostgreSQL 18
 - Database: `onusondhan` (or your chosen name)
 - Username: `onusondhan` (or your chosen name)
@@ -50,7 +50,7 @@ NODE_ENV=production
 PORT=3000
 TRUST_PROXY=1
 AUTO_MIGRATE=false
-DATABASE_URL=postgres://onusondhan:URL_ENCODED_PASSWORD@postgres:5432/onusondhan
+DATABASE_URL=PASTE_THE_POSTGRES_INTERNAL_CONNECTION_URL_FROM_DOKPLOY
 SESSION_SECRET=GENERATE_AT_LEAST_32_RANDOM_CHARACTERS
 MEDIA_ENDPOINT=https://YOUR_CLOUDFLARE_ACCOUNT_ID.r2.cloudflarestorage.com
 MEDIA_REGION=auto
@@ -62,7 +62,7 @@ MEDIA_FORCE_PATH_STYLE=false
 MEDIA_MAX_IMAGE_BYTES=10485760
 ```
 
-Replace the example database credentials with the values from the Dokploy PostgreSQL service. URL-encode reserved characters in the database password before putting it in `DATABASE_URL`. Generate the session secret with `openssl rand -hex 32`. Never commit real credentials to Git.
+Paste the PostgreSQL service's **Internal Connection URL** exactly as Dokploy displays it; do not guess the hostname. Generate the session secret with `openssl rand -hex 32`. Never commit real credentials to Git.
 
 The frontend's Nginx config targets `http://backend:3000`; therefore the backend must be reachable on the shared network under the hostname `backend`. Keep `AUTO_MIGRATE=false` until the Railway database dump has been restored and checked.
 
