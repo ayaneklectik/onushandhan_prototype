@@ -264,7 +264,8 @@
 
     if (!articles.length) return null;
     const section = document.createElement("section");
-    const layout = category.homepage_layout || "lead-headlines";
+    const mosaicCategories = ["reports", "opinion", "power-and-influence", "content-stories"];
+    const layout = mosaicCategories.includes(category.slug) ? "image-mosaic" : category.homepage_layout || "lead-headlines";
     section.className = `home-category-section layout-${layout}`;
     const heading = document.createElement("div");
     heading.className = "home-section-heading";
@@ -273,6 +274,44 @@
     heading.append(title, categoryLink(category));
     const body = document.createElement("div");
     body.className = "home-category-body";
+
+    if (layout === "image-mosaic") {
+      const grid = document.createElement("div");
+      grid.className = "home-mosaic-grid";
+
+      const lead = articles[0];
+      const leadCard = articleCard(lead);
+      leadCard.classList.add("home-mosaic-feature");
+      const leadCategory = document.createElement("p");
+      leadCategory.className = "story-category";
+      leadCategory.textContent = categoryName(lead, categories);
+      leadCard.prepend(leadCategory);
+
+      const supporting = document.createElement("div");
+      supporting.className = "home-mosaic-list";
+      articles.slice(1, 7).forEach((article) => {
+        const link = articleLink(article);
+        link.className = "home-mosaic-item";
+        if (article.image) {
+          const image = document.createElement("img");
+          image.src = article.image;
+          image.alt = article.image_alt || article.imageAlt || "";
+          image.loading = "lazy";
+          link.append(image);
+        }
+        const copy = document.createElement("div");
+        const headline = document.createElement("h3");
+        headline.textContent = article.headline || article.title;
+        copy.append(headline);
+        link.append(copy);
+        supporting.append(link);
+      });
+
+      grid.append(leadCard, supporting);
+      body.append(grid);
+      section.append(heading, body);
+      return section;
+    }
 
     if (layout === "image-grid") {
       const grid = document.createElement("div");
