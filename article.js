@@ -55,11 +55,15 @@
         target.append(element);
       }
     };
-    copySafe(parsed.body, fragment);
-    if (!fragment.childNodes.length && source.trim()) {
-      const paragraph = document.createElement("p");
-      paragraph.textContent = source.trim();
-      fragment.append(paragraph);
+    if (/<\\/?(?:p|h2|h3|strong|b|em|i|u|ul|ol|li|blockquote|a|br|span)\\b/i.test(source)) {
+      copySafe(parsed.body, fragment);
+    } else {
+      source.split(/\\n{2,}/).forEach((paragraphText) => {
+        if (!paragraphText.trim()) return;
+        const paragraph = document.createElement("p");
+        paragraph.textContent = paragraphText.trim();
+        fragment.append(paragraph);
+      });
     }
     return fragment;
   }
