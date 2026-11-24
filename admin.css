@@ -971,13 +971,22 @@ textarea {
 
 /* Dedicated full-page article editor */
 .article-editor-page {
-  padding: 22px;
+  width: 100%;
+  padding: 24px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface);
 }
-.article-editor-page .form-grid { gap: 18px; }
-.article-editor-page .article-rich-editor { min-height: 420px; max-height: none; }
+.article-editor-page .form-grid { gap: 20px; }
+.article-editor-page .form-grid > label.full-width { width: 100%; }
+.article-editor-page .article-rich-editor {
+  width: 100%;
+  min-height: min(68vh, 760px);
+  max-height: none;
+  padding: 22px;
+  font-size: 16px;
+  line-height: 2;
+}
 .article-editor-actions {
   position: sticky;
   z-index: 3;
