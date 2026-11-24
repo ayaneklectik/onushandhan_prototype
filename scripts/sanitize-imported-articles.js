@@ -36,7 +36,7 @@ function clean(value) {
     .replace(/<a\b[^>]*href=["'][^"']*(?:24ghonta|24-ghonta)[^"']*["'][^>]*>([\s\S]*?)<\/a>/gi, "$1")
     .replace(/(?:সূত্র|সৌজন্যে|প্রকাশক|প্রকাশনা)\s*[:：-]?\s*(?:২৪\s*ঘণ্টা(?:\s*টিভি)?|২৪\s*ঘন্টা(?:\s*টিভি)?|24\s*ghonta(?:\s*tv)?|24ghontatv(?:\.com)?)/giu, "")
     .replace(/https?:\/\/(?:www\.)?24ghontatv\.com[^\s"'<>)]*/gi, "")
-    .replace(/(?:24\s*ghonta\s*tv|24ghontatv|24-ghonta-tv|২৪\s*ঘণ্টা\s*টিভি|২৪\s*ঘন্টা\s*টিভি)/giu, "")
+    .replace(/(?:24[\s-]*ghonta(?:[\s-]*tv)?|২৪\s*ঘণ্টা\s*টিভি|২৪\s*ঘন্টা\s*টিভি|২৪ঘণ্টা|২৪ঘন্টা)/giu, "")
     .replace(/[ \t]{2,}/g, " ").replace(/\s+([,।;:])/g, "$1").trim();
 }
 
