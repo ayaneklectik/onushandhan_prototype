@@ -1,7 +1,16 @@
 (() => {
   const nav = document.querySelector("#category-nav");
   const articleView = document.querySelector("#article-detail");
-  const slug = new URLSearchParams(location.search).get("slug");
+  const articlePathMatch = location.pathname.match(/^\/news\/([^/]+)\/?$/);
+  let pathSlug = "";
+  if (articlePathMatch) {
+    try {
+      pathSlug = decodeURIComponent(articlePathMatch[1]);
+    } catch {
+      pathSlug = articlePathMatch[1];
+    }
+  }
+  const slug = new URLSearchParams(location.search).get("slug") || pathSlug;
 
   function showError(message) {
     const text = document.createElement("p");
@@ -85,12 +94,12 @@
           if (url) link.href = url;
         });
         const latest = document.createElement("a");
-        latest.href = "index.html";
+        latest.href = "/news";
         latest.textContent = "সর্বশেষ সংবাদ";
         nav.append(latest);
         site.categories.forEach((category) => {
           const link = document.createElement("a");
-          link.href = `index.html?category=${encodeURIComponent(category.slug)}`;
+          link.href = `/category/${encodeURIComponent(category.name)}`;
           const parent = site.categories.find((entry) => entry.id === category.parent_id);
           link.textContent = parent ? `${parent.name} / ${category.name}` : category.name;
           nav.append(link);
@@ -105,7 +114,7 @@
       document.title = `${siteName} | ${article.title}`;
       const category = document.createElement("a");
       category.className = "article-category";
-      category.href = `index.html?category=${encodeURIComponent(article.category_slug || "latest")}`;
+      category.href = article.category ? `/category/${encodeURIComponent(article.category)}` : "/news";
       category.textContent = article.category || "সর্বশেষ সংবাদ";
       const title = document.createElement("h1");
       title.textContent = article.headline || article.title;

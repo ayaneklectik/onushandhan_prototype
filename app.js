@@ -1,6 +1,16 @@
 (() => {
   const params = new URLSearchParams(window.location.search);
-  const categorySlug = params.get("category") || "latest";
+  const routePath = window.location.pathname.replace(/\/+$/, "") || "/";
+  let routeCategoryName = "";
+  if (routePath.startsWith("/category/")) {
+    try {
+      routeCategoryName = decodeURIComponent(routePath.slice("/category/".length));
+    } catch {
+      routeCategoryName = routePath.slice("/category/".length);
+    }
+  }
+  let categorySlug = params.get("category") || (routeCategoryName ? "" : "latest");
+  const isNewsListing = routePath === "/news";
   const searchQuery = params.get("q")?.trim() || "";
   const nav = document.querySelector("#category-nav");
   const pageTitle = document.querySelector("#page-title");
@@ -42,7 +52,7 @@
     card.className = "news-card";
     const link = document.createElement("a");
     link.className = "news-card-link";
-    link.href = `article.html?slug=${encodeURIComponent(article.slug)}`;
+    link.href = `/news/${encodeURIComponent(article.slug)}`;
 
     if (article.image) {
       const image = document.createElement("img");
@@ -68,14 +78,14 @@
   function articleLink(article) {
     const link = document.createElement("a");
     link.className = "news-card-link";
-    link.href = `article.html?slug=${encodeURIComponent(article.slug)}`;
+    link.href = `/news/${encodeURIComponent(article.slug)}`;
     return link;
   }
 
   function categoryLink(category) {
     const link = document.createElement("a");
     link.className = "home-section-link";
-    link.href = `index.html?category=${encodeURIComponent(category.slug)}`;
+    link.href = `/category/${encodeURIComponent(category.name)}`;
     link.textContent = "বিভাগে সব দেখুন →";
     return link;
   }
@@ -482,6 +492,12 @@
     }
 
     const categories = [{ slug: "latest", name: "সর্বশেষ সংবাদ", id: null }, ...data.categories];
+    if (routeCategoryName) {
+      const routeCategory = data.categories.find(
+        (item) => item.name.normalize("NFC") === routeCategoryName.normalize("NFC"),
+      );
+      if (routeCategory) categorySlug = routeCategory.slug;
+    }
     const headerAnnouncement = document.querySelector("#header-announcement");
     if (headerAnnouncement) {
       headerAnnouncement.textContent = data.settings?.header_text || "";
@@ -512,8 +528,8 @@
       const link = document.createElement("a");
       link.href =
         item.slug === "latest"
-          ? "index.html"
-          : `index.html?category=${encodeURIComponent(item.slug)}`;
+          ? "/news"
+          : `/category/${encodeURIComponent(item.name)}`;
       const parent = data.categories.find((entry) => entry.id === item.parent_id);
       link.textContent = parent ? `${parent.name} / ${item.name}` : item.name;
       if (item.slug === categorySlug) {
@@ -558,7 +574,7 @@
 
     let articles = data.articles;
     const videos = categorySlug === "video-podcast" ? data.videos : [];
-    if (categorySlug === "latest") {
+    if (categorySlug === "latest" && !isNewsListing) {
       homePage(data, articles);
       return;
     }
