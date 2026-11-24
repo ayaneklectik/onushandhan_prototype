@@ -84,6 +84,57 @@
       "'": "&#39;",
     })[character]);
   }
+  function decodeStoredMarkup(value = "") {
+    let source = String(value || "").replace(/\\(?=\s*<\/)/g, "");
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      if (!/&lt;\/?(?:span|p|strong|b|em|i|u|h[2-3]|ul|ol|li|blockquote|a|br)\b/i.test(source)) break;
+      const decoded = new DOMParser().parseFromString(source, "text/html").body.textContent || "";
+      if (decoded === source) break;
+      source = decoded;
+    }
+    return source;
+  }
+
+  function safeArticleMarkup(value = "") {
+    const parsed = new DOMParser().parseFromString(decodeStoredMarkup(value), "text/html");
+    const allowed = new Set(["P", "BR", "H2", "H3", "STRONG", "B", "EM", "I", "U", "UL", "OL", "LI", "BLOCKQUOTE", "A", "SPAN"]);
+    const output = document.createElement("div");
+    const copySafe = (source, target) => {
+      for (const child of source.childNodes) {
+        if (child.nodeType === Node.TEXT_NODE) {
+          target.append(document.createTextNode(child.textContent));
+          continue;
+        }
+        if (child.nodeType !== Node.ELEMENT_NODE) continue;
+        if (!allowed.has(child.tagName)) {
+          copySafe(child, target);
+          continue;
+        }
+        const element = document.createElement(child.tagName.toLowerCase());
+        if (child.tagName === "A") {
+          const href = child.getAttribute("href") || "";
+          if (/^https:\/\//i.test(href)) {
+            element.href = href;
+            element.target = "_blank";
+            element.rel = "noopener noreferrer";
+          }
+        }
+        if (child.tagName === "SPAN") {
+          const weight = child.style.fontWeight;
+          const fontStyle = child.style.fontStyle;
+          const decoration = child.style.textDecoration;
+          if (/^(normal|bold|[1-9]00)$/i.test(weight)) element.style.fontWeight = weight;
+          if (/^(italic|oblique)$/i.test(fontStyle)) element.style.fontStyle = fontStyle;
+          if (/^(underline|line-through)$/i.test(decoration)) element.style.textDecoration = decoration;
+        }
+        copySafe(child, element);
+        target.append(element);
+      }
+    };
+    copySafe(parsed.body, output);
+    return output.innerHTML;
+  }
+
   function date(value) {
     if (!value) return "—";
     return new Intl.DateTimeFormat("en", {
@@ -419,7 +470,7 @@
               <button type="button" data-format="link">লিংক</button>
               <button type="button" data-format="remove">ফরম্যাট মুছুন</button>
             </div>
-            <div id="article-body-editor" class="article-rich-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="এখানে প্রতিবেদন লিখুন…">${(() => { const raw = String(article?.body || ""); const parsed = new DOMParser().parseFromString(raw, "text/html"); return /&lt;\/?(?:span|p|strong|b|em|i|u|h[2-3]|ul|ol|li|blockquote)\b/i.test(raw) ? parsed.body.textContent : raw; })()}</div>
+            <div id="article-body-editor" class="article-rich-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="এখানে প্রতিবেদন লিখুন…"></div>
             <textarea name="body" hidden maxlength="100000">${escapeHtml(article?.body || "")}</textarea>
           </label>
         </div>
@@ -435,6 +486,7 @@
     const form = document.querySelector("#article-editor");
     const richEditor = form.querySelector("#article-body-editor");
     const bodyField = form.elements.body;
+    richEditor.innerHTML = safeArticleMarkup(article?.body || "");
     form.querySelectorAll("[data-format]").forEach((button) => {
       button.addEventListener("mousedown", (event) => event.preventDefault());
       button.addEventListener("click", () => {
@@ -483,7 +535,7 @@
         title: formData.get("title"),
         headline: formData.get("headline"),
         summary: formData.get("summary"),
-        body: (() => { const html = richEditor.innerHTML; const parsed = new DOMParser().parseFromString(html, "text/html"); return /&lt;\/?(?:span|p|strong|b|em|i|u|h[2-3]|ul|ol|li|blockquote)\b/i.test(html) ? parsed.body.textContent : html; })(),
+        body: safeArticleMarkup(richEditor.innerHTML),
         attribution: formData.get("attribution"),
         imageCaption: formData.get("imageCaption"),
         imageCredit: formData.get("imageCredit"),

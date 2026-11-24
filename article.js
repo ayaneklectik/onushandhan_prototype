@@ -20,15 +20,11 @@
 
   function renderBody(body) {
     const fragment = document.createDocumentFragment();
-    let source = String(body || "");
-    let parsed = new DOMParser().parseFromString(source, "text/html");
-    if (/&lt;\/?(?:span|p|strong|b|em|i|u|h[2-3]|ul|ol|li|blockquote|a|br)\b/i.test(source)) {
-      source = parsed.body.textContent;
-      parsed = new DOMParser().parseFromString(source, "text/html");
-    }
-    const allowed = new Set(["P", "BR", "H2", "H3", "STRONG", "B", "EM", "I", "U", "UL", "OL", "LI", "BLOCKQUOTE", "A"]);
-    const copySafe = (source, target) => {
-      for (const child of source.childNodes) {
+    const source = decodeStoredMarkup(body);
+    const parsed = new DOMParser().parseFromString(source, "text/html");
+    const allowed = new Set(["P", "BR", "H2", "H3", "STRONG", "B", "EM", "I", "U", "UL", "OL", "LI", "BLOCKQUOTE", "A", "SPAN"]);
+    const copySafe = (root, target) => {
+      for (const child of root.childNodes) {
         if (child.nodeType === Node.TEXT_NODE) {
           target.append(document.createTextNode(child.textContent));
           continue;
@@ -47,21 +43,36 @@
             element.rel = "noopener noreferrer";
           }
         }
+        if (child.tagName === "SPAN") {
+          const weight = child.style.fontWeight;
+          const fontStyle = child.style.fontStyle;
+          const decoration = child.style.textDecoration;
+          if (/^(normal|bold|[1-9]00)$/i.test(weight)) element.style.fontWeight = weight;
+          if (/^(italic|oblique)$/i.test(fontStyle)) element.style.fontStyle = fontStyle;
+          if (/^(underline|line-through)$/i.test(decoration)) element.style.textDecoration = decoration;
+        }
         copySafe(child, element);
         target.append(element);
       }
     };
-    if (/<\/?(p|h2|h3|strong|b|em|i|u|ul|ol|li|blockquote|a|br|span)\b/i.test(source)) {
-      copySafe(parsed.body, fragment);
-    } else {
-      String(body || "").split(/\n{2,}/).forEach((paragraph) => {
-        if (!paragraph.trim()) return;
-        const element = document.createElement("p");
-        element.textContent = paragraph.trim();
-        fragment.append(element);
-      });
+    copySafe(parsed.body, fragment);
+    if (!fragment.childNodes.length && source.trim()) {
+      const paragraph = document.createElement("p");
+      paragraph.textContent = source.trim();
+      fragment.append(paragraph);
     }
     return fragment;
+  }
+
+  function decodeStoredMarkup(value = "") {
+    let source = String(value || "").replace(/\\(?=\s*<\/)/g, "");
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      if (!/&lt;\/?(?:span|p|strong|b|em|i|u|h[2-3]|ul|ol|li|blockquote|a|br)\b/i.test(source)) break;
+      const decoded = new DOMParser().parseFromString(source, "text/html").body.textContent || "";
+      if (decoded === source) break;
+      source = decoded;
+    }
+    return source;
   }
 
   async function render() {
