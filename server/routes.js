@@ -62,7 +62,7 @@ async function articleRecord(client, id) {
             a.image_alt, a.attribution, a.image_caption, a.image_credit, a.category_id, a.status, a.author_id, a.published_at,
             a.created_at, a.updated_at, u.username AS author,
             c.name AS category, c.slug AS category_slug, c.parent_id AS category_parent_id
-     FROM articles a
+     FROM articles a JOIN users u ON u.id = a.author_id
      LEFT JOIN categories c ON c.id = a.category_id
      WHERE a.id = $1`,
     [id],
@@ -146,7 +146,6 @@ api.get("/public/site", async (_req, res) => {
             a.category_id, a.published_at,
             c.name AS category, c.slug AS category_slug
      FROM articles a
-     JOIN users u ON u.id = a.author_id
      LEFT JOIN categories c ON c.id = a.category_id
      LEFT JOIN categories parent ON parent.id = c.parent_id
      WHERE a.status = 'published'
@@ -234,7 +233,7 @@ api.get("/public/articles/:slug", async (req, res) => {
     `SELECT a.id, a.slug, a.title, a.headline, a.summary, a.body, a.image_key,
             a.image_alt, a.image_caption, a.image_credit, a.published_at,
             c.name AS category, c.slug AS category_slug
-     FROM articles a JOIN users u ON u.id = a.author_id
+     FROM articles a
      LEFT JOIN categories c ON c.id = a.category_id
      LEFT JOIN categories parent ON parent.id = c.parent_id
      WHERE a.slug = $1 AND a.status = 'published'
