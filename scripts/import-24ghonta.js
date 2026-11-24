@@ -21,7 +21,7 @@ function abs(s,base){try{return new URL(entities(s),base).href;}catch{return nul
 function articleUrl(s){const u=abs(s,ROOT);if(!u)return null;const x=new URL(u);return x.protocol==="https:"&&["24ghontatv.com","www.24ghontatv.com"].includes(x.hostname)&&/^\/news\/\d+\/?$/.test(x.pathname)?x.origin+x.pathname.replace(/\/$/,""):null;}
 function links(html){return [...new Set([...html.matchAll(/href=["']([^"']*\/news\/\d+\/?)["']/gi)].map(m=>articleUrl(m[1])).filter(Boolean))];}
 async function html(url){const r=await fetch(url,{headers:{"user-agent":"Onushondhan authorized content migration"}});if(!r.ok)throw Error("HTTP "+r.status+" "+url);if(!["24ghontatv.com","www.24ghontatv.com"].includes(new URL(r.url).hostname))throw Error("Unexpected redirect host");return r.text();}
-function dateFrom(s){const m=s.match(/প্রকাশ\s*:\s*([০-৯0-9]{1,2}\s+[^\s|,]+,?\s+[০-৯0-9]{4})\s*\|\s*([০-৯0-9]{1,2}:[০-৯0-9]{2})/);if(!m)return null;const d=m[1].replace(/[০-৯]/g,c=>String("০১২৩৪৫৬৭৮৯".indexOf(c))).replace(",","").trim().split(/\s+/);const t=m[2].replace(/[০-৯]/g,c=>String("০১২৩৪৫৬৭৮৯".indexOf(c))).split(":").map(Number);const month=MONTHS[d[1]];if(month===undefined)return null;const v=new Date(Date.UTC(+d[2],month,+d[0],t[0],t[1]));return Number.isNaN(v.getTime())?null:v.toISOString();}
+function dateFrom(s){const text=plain(s);const m=text.match(/প্রকাশ\s*:\s*([০-৯0-9]{1,2}\s+[^\s|,]+,?\s+[০-৯0-9]{4})(?:\s*\|\s*([০-৯0-9]{1,2}:[০-৯0-9]{2}))?/);if(!m)return null;const d=m[1].replace(/[০-৯]/g,c=>String("০১২৩৪৫৬৭৮৯".indexOf(c))).replace(",","").trim().split(/\s+/);const t=(m[2]||"00:00").replace(/[০-৯]/g,c=>String("০১২৩৪৫৬৭৮৯".indexOf(c))).split(":").map(Number);const month=MONTHS[d[1]];if(month===undefined)return null;const v=new Date(Date.UTC(+d[2],month,+d[0],t[0],t[1]));return Number.isNaN(v.getTime())?null:v.toISOString();}
 function bodyHtml(a){
  const src=a.replace(/<figure\b[\s\S]*?<\/figure>/gi," ").replace(/<(script|style|nav|aside|form)\b[\s\S]*?<\/\1>/gi," ");
  const out=[];
@@ -36,7 +36,9 @@ function bodyHtml(a){
 function imageFrom(a){
  const fig=a.match(/<figure\b[\s\S]*?<\/figure>/i)?.[0];const img=fig?.match(/<img\b[^>]*>/i)?.[0];const src=img?.match(/\bsrc=["']([^"']+)["']/i)?.[1];if(!src)return null;
  const url=abs(src,ROOT);if(!url)return null;const u=new URL(url);if(u.protocol!=="https:"||!IMAGE_HOSTS.has(u.hostname))return null;
- return {url,alt:entities(img.match(/\balt=["']([^"']*)["']/i)?.[1]||"")};
+ const rawCaption=plain(fig?.match(/<figcaption\b[^>]*>([\s\S]*?)<\/figcaption>/i)?.[1]||"");
+ const isCredit=/^ছবি\s*[:：]/.test(rawCaption);
+ return {url,alt:entities(img.match(/\balt=["']([^"']*)["']/i)?.[1]||""),caption:isCredit?"":rawCaption,credit:isCredit?rawCaption.replace(/^ছবি\s*[:：]\s*/,"").trim():""};
 }
 async function readArticle(url){
  const page=await html(url);const a=page.match(/<article\b[\s\S]*?<\/article>/i)?.[0];if(!a)throw Error("Article element missing");
@@ -97,7 +99,7 @@ async function main(){
    try{
     await db.query("BEGIN");
     await db.query("INSERT INTO media_assets (id,object_key,media_type,content_type,size_bytes,status,uploader_id) VALUES ($1,$2,'image',$3,$4,'ready',$5)",[assetId,key,img.type,img.bytes.length,users.rows[0].id]);
-    await db.query("INSERT INTO articles (id,slug,title,headline,summary,body,image_key,image_alt,category_id,status,author_id,published_at,attribution,image_caption,image_credit) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'published',$10,$11,$12,'','')",[articleId,"24ghontatv-"+a.id,a.title,a.headline,a.summary,a.body,key,a.image.alt||a.title,a.categoryId,users.rows[0].id,a.publishedAt,"সূত্র: ২৪ঘণ্টা"]);
+    await db.query("INSERT INTO articles (id,slug,title,headline,summary,body,image_key,image_alt,category_id,status,author_id,published_at,attribution,image_caption,image_credit) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,'published',$10,$11,$12,$13,$14)",[articleId,"24ghontatv-"+a.id,a.title,a.headline,a.summary,a.body,key,a.image.alt||a.title,a.categoryId,users.rows[0].id,a.publishedAt,"সূত্র: ২৪ঘণ্টা",a.image.caption,a.image.credit]);
     await db.query("INSERT INTO external_article_imports (article_id,source_url,source_name,batch_key,source_published_at) VALUES ($1,$2,'24GhontaTV',$3,$4)",[articleId,a.url,BATCH,a.publishedAt]);
     await db.query("COMMIT");
    }catch(e){await db.query("ROLLBACK");throw e;}finally{db.release();}
