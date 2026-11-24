@@ -63,7 +63,6 @@ async function articleRecord(client, id) {
             a.created_at, a.updated_at, u.username AS author,
             c.name AS category, c.slug AS category_slug, c.parent_id AS category_parent_id
      FROM articles a
-     JOIN users u ON u.id = a.author_id
      LEFT JOIN categories c ON c.id = a.category_id
      WHERE a.id = $1`,
     [id],
@@ -144,7 +143,7 @@ api.get("/public/site", async (_req, res) => {
   );
   const articlesResult = await pool.query(
     `SELECT a.id, a.slug, a.title, a.headline, a.summary, a.image_key, a.image_alt,
-            a.category_id, a.published_at, u.username AS author,
+            a.category_id, a.published_at,
             c.name AS category, c.slug AS category_slug
      FROM articles a
      JOIN users u ON u.id = a.author_id
@@ -179,9 +178,9 @@ api.get("/public/site", async (_req, res) => {
   );
   const placementsResult = await pool.query(
     `SELECT p.placement, a.id, a.slug, a.title, a.headline, a.summary, a.image_key, a.image_alt,
-            a.category_id, a.published_at, u.username AS author, c.name AS category, c.slug AS category_slug
+            a.category_id, a.published_at, c.name AS category, c.slug AS category_slug
      FROM article_placements p JOIN articles a ON a.id=p.article_id
-     JOIN users u ON u.id=a.author_id LEFT JOIN categories c ON c.id=a.category_id
+     LEFT JOIN categories c ON c.id=a.category_id
      WHERE a.status='published' ORDER BY p.placement,p.sort_order`,
   );
   const contentEntriesResult = await pool.query(
@@ -233,7 +232,7 @@ api.get("/public/site", async (_req, res) => {
 api.get("/public/articles/:slug", async (req, res) => {
   const result = await pool.query(
     `SELECT a.id, a.slug, a.title, a.headline, a.summary, a.body, a.image_key,
-            a.image_alt, a.attribution, a.image_caption, a.image_credit, a.published_at, u.username AS author,
+            a.image_alt, a.image_caption, a.image_credit, a.published_at,
             c.name AS category, c.slug AS category_slug
      FROM articles a JOIN users u ON u.id = a.author_id
      LEFT JOIN categories c ON c.id = a.category_id
