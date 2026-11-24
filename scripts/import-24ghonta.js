@@ -6,7 +6,7 @@ import { pool } from "../server/db.js";
 const ROOT = "https://24ghontatv.com";
 const BATCH = "24ghontatv-100-v1";
 const MONTHS = {"জানুয়ারি":0,"জানুয়ারি":0,"ফেব্রুয়ারি":1,"ফেব্রুয়ারি":1,"মার্চ":2,"এপ্রিল":3,"মে":4,"জুন":5,"জুলাই":6,"আগস্ট":7,"সেপ্টেম্বর":8,"অক্টোবর":9,"নভেম্বর":10,"ডিসেম্বর":11};
-const MAP = {"মতামত":"opinion","বিশ্লেষণ":"opinion","রাজনীতি":"power-and-influence","দুর্নীতি":"corruption","অপরাধ":"organized-crime","আইন ও বিচার":"organized-crime","মানবাধিকার":"freedom-and-repression","বিনোদন":"content-stories","লাইফস্টাইল":"content-stories","শিক্ষা":"content-stories","কৃষি":"content-stories"};
+const MAP = {"মতামত":"opinion","বিশ্লেষণ":"opinion","রাজনীতি":"power-and-influence","দুর্নীতি":"corruption","অপরাধ":"organized-crime","আইন ও বিচার":"organized-crime","মানবাধিকার":"freedom-and-repression","বিনোদন":"content-stories","লাইফস্টাইল":"content-stories","জীবন শৈলী":"content-stories","জীবনশৈলী":"content-stories","শিক্ষা":"content-stories","কৃষি":"content-stories"};
 const IMAGE_HOSTS = new Set(["media.concordleads.cloud"]);
 let s3;
 function storage() {
