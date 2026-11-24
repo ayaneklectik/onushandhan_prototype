@@ -55,10 +55,10 @@
         target.append(element);
       }
     };
-    if (/<\\/?(?:p|h2|h3|strong|b|em|i|u|ul|ol|li|blockquote|a|br|span)\\b/i.test(source)) {
+    if (/<\/?(?:p|h2|h3|strong|b|em|i|u|ul|ol|li|blockquote|a|br|span)\b/i.test(source)) {
       copySafe(parsed.body, fragment);
     } else {
-      source.split(/\\n{2,}/).forEach((paragraphText) => {
+      source.split(/\n{2,}/).forEach((paragraphText) => {
         if (!paragraphText.trim()) return;
         const paragraph = document.createElement("p");
         paragraph.textContent = paragraphText.trim();
