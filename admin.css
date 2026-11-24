@@ -967,3 +967,31 @@ textarea {
 .article-rich-editor ul,.article-rich-editor ol{padding-left:28px}
 
 .nav-group{margin:0 0 18px}.nav-group .sidebar-label{margin:0 0 7px;padding:0 12px}.nav-group a{margin-bottom:3px}
+
+
+/* Dedicated full-page article editor */
+.article-editor-page {
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.article-editor-page .form-grid { gap: 18px; }
+.article-editor-page .article-rich-editor { min-height: 420px; max-height: none; }
+.article-editor-actions {
+  position: sticky;
+  z-index: 3;
+  bottom: 0;
+  align-items: center;
+  margin: 20px -22px -22px;
+  padding: 14px 22px;
+  border-top: 1px solid var(--line);
+  background: rgb(255 255 255 / 96%);
+  box-shadow: 0 -8px 20px rgb(23 26 31 / 5%);
+}
+.article-editor-action-spacer { flex: 1; }
+@media (max-width: 620px) {
+  .article-editor-page { padding: 14px; }
+  .article-editor-actions { margin: 16px -14px -14px; padding: 12px 14px; gap: 6px; }
+  .article-editor-actions .button { flex: 1 1 auto; }
+}
