@@ -5,6 +5,7 @@
     view: "dashboard",
     articleOffset: 0,
     articleFilters: {},
+    editorReturnView: "articles",
     categories: [],
     articles: [],
     toastTimer: null,
@@ -29,7 +30,8 @@
   };
   const navigation = [
     { id: "dashboard", label: "Dashboard", group: "Overview", symbol: "⌂", roles: ["super_admin", "admin", "moderator"] },
-    { id: "articles", label: "New Post / Edit Posts", group: "Posts / Articles", symbol: "▤", roles: ["super_admin", "admin", "moderator"] },
+    { id: "articles", label: "Manage All News", group: "Posts / Articles", symbol: "▤", roles: ["super_admin", "admin", "moderator"] },
+    { id: "create-article", label: "Create New Article", group: "Posts / Articles", symbol: "＋", roles: ["super_admin", "admin", "moderator"] },
     { id: "drafts", label: "Drafts", group: "Posts / Articles", symbol: "◷", roles: ["super_admin", "admin", "moderator"] },
     { id: "top-news", label: "Top News", group: "Editorial", symbol: "★", roles: ["super_admin"] },
     { id: "recent", label: "Recent", group: "Editorial", symbol: "◷", roles: ["super_admin"] },
@@ -197,6 +199,7 @@
     try {
       if (view === "dashboard") await renderDashboard();
       if (view === "articles") { state.articleFilters = {}; state.articleOffset = 0; await renderArticles(); }
+      if (view === "create-article") { state.editorReturnView = "articles"; await openArticleEditor(); }
       if (view === "drafts") { state.articleFilters = { status: "draft" }; state.articleOffset = 0; await renderArticles(); }
       if (view === "videos") await renderVideos();
       if (view === "categories") await renderCategories();
@@ -301,8 +304,7 @@
       `;
     }).join("");
     pageContent.innerHTML = `
-      ${setHeading("Manage all news", `${data.total} article${data.total === 1 ? "" : "s"} in this view.`,
-        '<button class="button button-primary" data-action="new-article">＋ New article</button>')}
+      ${setHeading("Manage All News", `${data.total} article${data.total === 1 ? "" : "s"} in this view.`)}
       <form id="article-filters" class="filters">
         <input name="q" aria-label="Search articles" placeholder="Search title or headline" value="${escapeHtml(state.articleFilters.q || "")}">
         <select name="status" aria-label="Filter by status">
@@ -360,7 +362,14 @@
   async function openArticleEditor(articleId = "") {
     await getEditorCategories();
     const article = articleId ? (await request(`/api/admin/articles/${articleId}`)).article : null;
-    openModal(article ? "Edit article" : "Create article", `
+    if (articleId) {
+      state.editorReturnView = state.view === "drafts" ? "drafts" : "articles";
+      state.view = "articles";
+      renderNavigation();
+    }
+    pageContent.innerHTML = `
+      ${setHeading(article ? "Edit Article" : "Create New Article", article ? `Editing: ${escapeHtml(article.title)}` : "Write and publish a new article.", '<button type="button" class="button button-secondary" data-action="back-to-articles">← Back to news</button>')}
+      <section class="article-editor-page">
       <form id="article-editor" class="stack-form" data-id="${article?.id || ""}">
         <div class="form-grid">
           <label class="full-width">Title <input name="title" maxlength="240" required value="${escapeHtml(article?.title || "")}"></label>
@@ -402,12 +411,14 @@
             <textarea name="body" hidden maxlength="100000">${escapeHtml(article?.body || "")}</textarea>
           </label>
         </div>
-        <div class="form-actions">
-          <button type="button" class="button button-secondary" data-action="close-modal">Cancel</button>
-          <button type="submit" class="button button-secondary" data-submit-action="save">Save draft</button>
+        <div class="form-actions article-editor-actions">
+          <button type="button" class="button button-secondary" data-action="back-to-articles">Cancel</button>
+          <span class="article-editor-action-spacer"></span>
+          <button type="submit" class="button button-secondary" data-submit-action="save">${article ? "Save changes" : "Save draft"}</button>
           ${state.user.role === "moderator" ? "" : '<button type="submit" class="button button-primary" data-submit-action="publish">Save & publish</button>'}
         </div>
       </form>
+      </section>
     `);
     const form = document.querySelector("#article-editor");
     const richEditor = form.querySelector("#article-body-editor");
@@ -484,8 +495,11 @@
             body: JSON.stringify({ status: "published" }),
           });
         }
-        closeModal();
-        showToast(submitAction === "publish" ? "Article published." : "Draft saved.");
+        showToast(submitAction === "publish" ? "Article published." : article ? "Article changes saved." : "Draft saved.");
+        state.view = "articles";
+        state.articleFilters = {};
+        state.articleOffset = 0;
+        renderNavigation();
         await renderArticles();
       } catch (error) {
         showToast(error.message, true);
@@ -1025,8 +1039,14 @@
           await request(`/api/admin/content/${state.view}/${id}`,{method:"DELETE"});
           showToast("Entry deleted."); await renderContentModule(state.view);
         }
-        if (action === "new-article") await openArticleEditor();
+        if (action === "new-article") { state.editorReturnView = state.view; await openArticleEditor(); }
         if (action === "edit-article") await openArticleEditor(id);
+        if (action === "back-to-articles") {
+          state.view = state.editorReturnView === "drafts" ? "drafts" : "articles";
+          renderNavigation();
+          if (state.view === "drafts") { state.articleFilters = { status: "draft" }; state.articleOffset = 0; }
+          await renderArticles();
+        }
         if (action === "preview-article") {
           const article = (await request(`/api/admin/articles/${id}`)).article;
           article.image_url = article.image_url || "";
@@ -1113,16 +1133,13 @@
       await renderArticles();
     });
 
-    modalContent.addEventListener("click", (event) => {
-      const button = event.target.closest("[data-action]");
+    pageContent.addEventListener("click", (event) => {
+      const button = event.target.closest('[data-action="clear-article-image"]');
       if (!button) return;
-      if (button.dataset.action === "close-modal") closeModal();
-      if (button.dataset.action === "clear-article-image") {
-        const form = document.querySelector("#article-editor");
-        form.elements.imageKey.value = "";
-        document.querySelector("#article-image-preview").removeAttribute("src");
-        document.querySelector("#article-upload-status").textContent = "Article image removed.";
-      }
+      const form = document.querySelector("#article-editor");
+      form.elements.imageKey.value = "";
+      document.querySelector("#article-image-preview").removeAttribute("src");
+      document.querySelector("#article-upload-status").textContent = "Article image removed.";
     });
   }
 
