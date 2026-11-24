@@ -89,7 +89,9 @@ async function main(){
  const urls=(await discover()).filter(x=>!known.has(x));
  console.log("Discovered",urls.length,"new article URLs.");
  const valid=[],skipped=[];
- for(const url of urls){try{const a=await readArticle(url);const slug=MAP[a.category]||"reports";a.categoryId=categoryBySlug.get(slug)?.id||categoryBySlug.get("reports")?.id;if(!a.categoryId)throw Error("No destination category");valid.push(a);}catch(e){skipped.push({url,reason:e.message});}}
+ let nextIndex=0,completed=0;
+ const worker=async()=>{while(true){const index=nextIndex++;if(index>=urls.length)return;const url=urls[index];try{const a=await readArticle(url);const slug=MAP[a.category]||"reports";a.categoryId=categoryBySlug.get(slug)?.id||categoryBySlug.get("reports")?.id;if(!a.categoryId)throw Error("No destination category");valid.push(a);}catch(e){skipped.push({url,reason:e.message});}completed++;if(completed%10===0||completed===urls.length)console.log("Checked",completed+"/"+urls.length,"Valid",valid.length,"Skipped",skipped.length);}};
+ await Promise.all(Array.from({length:Math.min(6,urls.length)},()=>worker()));
  const selected=shuffle(valid).slice(0,100);
  console.log("Valid:",valid.length,"Selected:",selected.length,"Skipped:",skipped.length);
  if(selected.length!==100){console.log("No changes made. Skipped examples:",skipped.slice(0,10));throw Error("Need 100 valid articles; found "+selected.length);}
