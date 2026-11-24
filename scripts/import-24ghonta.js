@@ -41,7 +41,14 @@ function imageFrom(a){
  return {url,alt:entities(img.match(/\balt=["']([^"']*)["']/i)?.[1]||""),caption:isCredit?"":rawCaption,credit:isCredit?rawCaption.replace(/^ছবি\s*[:：]\s*/,"").trim():""};
 }
 async function readArticle(url){
- const page=await html(url);const a=page.match(/<article\b[\s\S]*?<\/article>/i)?.[0];if(!a)throw Error("Article element missing");
+ let page="",a=null,lastLength=0;
+ for(let attempt=1;attempt<=3;attempt++){
+  page=await html(url);lastLength=page.length;
+  a=page.match(/<article\b[\s\S]*?<\/article>/i)?.[0]||null;
+  if(a)break;
+  if(attempt<3)await new Promise(resolve=>setTimeout(resolve,500*attempt));
+ }
+ if(!a)throw Error("Article element missing after 3 attempts (last HTML length "+lastLength+")");
  const title=plain(a.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i)?.[1]||"");
  const ps=[...a.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)].map(x=>plain(x[1])).filter(x=>x.length>35);
  const category=plain(a.match(/<div\b[^>]*>\s*([^<]{2,50})\s*<\/div>/i)?.[1]||"");
