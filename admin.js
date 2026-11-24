@@ -404,7 +404,7 @@
           <label>Image description <input name="imageAlt" maxlength="300" value="${escapeHtml(article?.image_alt || "")}"></label>
           <label class="full-width">Photo caption / ছবির ক্যাপশন <input name="imageCaption" maxlength="500" value="${escapeHtml(article?.image_caption || "")}"></label>
           <label>Photo credit / ছবির সূত্র <input name="imageCredit" maxlength="300" value="${escapeHtml(article?.image_credit || "")}" placeholder="ছবি: নিজস্ব প্রতিবেদক"></label>
-          <label>Attribution / প্রতিবেদনের সূত্র <input name="attribution" maxlength="300" value="${escapeHtml(article?.attribution || "")}" placeholder="২৪ঘণ্টা অনলাইন"></label>
+          <label>Attribution / প্রতিবেদনের সূত্র <input name="attribution" maxlength="300" value="${escapeHtml(article?.attribution || "")}" placeholder="প্রতিবেদনের সূত্র (ঐচ্ছিক)"></label>
           <input type="hidden" name="imageKey" value="${escapeHtml(article?.image_key || "")}">
           <label class="full-width">Article body / প্রতিবেদনের মূল লেখা
             <div class="editor-toolbar" role="toolbar" aria-label="Text formatting">
