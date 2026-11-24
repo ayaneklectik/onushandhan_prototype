@@ -20,7 +20,7 @@ function plain(s){return entities((s||"").replace(/<script\b[\s\S]*?<\/script>/g
 function abs(s,base){try{return new URL(entities(s),base).href;}catch{return null;}}
 function articleUrl(s){const u=abs(s,ROOT);if(!u)return null;const x=new URL(u);return x.protocol==="https:"&&["24ghontatv.com","www.24ghontatv.com"].includes(x.hostname)&&/^\/news\/\d+\/?$/.test(x.pathname)?x.origin+x.pathname.replace(/\/$/,""):null;}
 function links(html){return [...new Set([...html.matchAll(/href=["']([^"']*\/news\/\d+\/?)["']/gi)].map(m=>articleUrl(m[1])).filter(Boolean))];}
-async function html(url){const r=await fetch(url,{headers:{"user-agent":"Onushondhan authorized content migration"}});if(!r.ok)throw Error("HTTP "+r.status+" "+url);if(!["24ghontatv.com","www.24ghontatv.com"].includes(new URL(r.url).hostname))throw Error("Unexpected redirect host");return r.text();}
+async function html(url){const r=await fetch(url,{headers:{"user-agent":"Mozilla/5.0 (compatible; Onushondhan content migration)","cache-control":"no-cache","pragma":"no-cache"}});if(!r.ok)throw Error("HTTP "+r.status+" "+url);if(!["24ghontatv.com","www.24ghontatv.com"].includes(new URL(r.url).hostname))throw Error("Unexpected redirect host");return r.text();}
 function dateFrom(s){const text=plain(s);const m=text.match(/প্রকাশ\s*:\s*([০-৯0-9]{1,2}\s+[^\s|,]+,?\s+[০-৯0-9]{4})(?:\s*\|\s*([০-৯0-9]{1,2}:[০-৯0-9]{2}))?/);if(!m)return null;const d=m[1].replace(/[০-৯]/g,c=>String("০১২৩৪৫৬৭৮৯".indexOf(c))).replace(",","").trim().split(/\s+/);const t=(m[2]||"00:00").replace(/[০-৯]/g,c=>String("০১২৩৪৫৬৭৮৯".indexOf(c))).split(":").map(Number);const month=MONTHS[d[1]];if(month===undefined)return null;const v=new Date(Date.UTC(+d[2],month,+d[0],t[0],t[1]));return Number.isNaN(v.getTime())?null:v.toISOString();}
 function bodyHtml(a){
  const src=a.replace(/<figure\b[\s\S]*?<\/figure>/gi," ").replace(/<(script|style|nav|aside|form)\b[\s\S]*?<\/\1>/gi," ");
@@ -42,13 +42,13 @@ function imageFrom(a){
 }
 async function readArticle(url){
  let page="",a=null,lastLength=0;
- for(let attempt=1;attempt<=3;attempt++){
+ for(let attempt=1;attempt<=5;attempt++){
   page=await html(url);lastLength=page.length;
   a=page.match(/<article\b[\s\S]*?<\/article>/i)?.[0]||null;
   if(a)break;
-  if(attempt<3)await new Promise(resolve=>setTimeout(resolve,500*attempt));
+  if(attempt<5)await new Promise(resolve=>setTimeout(resolve,750*attempt));
  }
- if(!a)throw Error("Article element missing after 3 attempts (last HTML length "+lastLength+")");
+ if(!a)throw Error("Article element missing after 5 attempts (last HTML length "+lastLength+")");
  const title=plain(a.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i)?.[1]||"");
  const ps=[...a.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)].map(x=>plain(x[1])).filter(x=>x.length>35);
  const category=plain(a.match(/<div\b[^>]*>\s*([^<]{2,50})\s*<\/div>/i)?.[1]||"");
@@ -91,7 +91,7 @@ async function main(){
  const valid=[],skipped=[];
  let nextIndex=0,completed=0;
  const worker=async()=>{while(true){const index=nextIndex++;if(index>=urls.length)return;const url=urls[index];try{const a=await readArticle(url);const slug=MAP[a.category]||"reports";a.categoryId=categoryBySlug.get(slug)?.id||categoryBySlug.get("reports")?.id;if(!a.categoryId)throw Error("No destination category");valid.push(a);}catch(e){skipped.push({url,reason:e.message});}completed++;if(completed%10===0||completed===urls.length)console.log("Checked",completed+"/"+urls.length,"Valid",valid.length,"Skipped",skipped.length);}};
- await Promise.all(Array.from({length:Math.min(6,urls.length)},()=>worker()));
+ await Promise.all(Array.from({length:Math.min(3,urls.length)},()=>worker()));
  const selected=shuffle(valid).slice(0,100);
  console.log("Valid:",valid.length,"Selected:",selected.length,"Skipped:",skipped.length);
  if(selected.length!==100){console.log("No changes made. Skipped examples:",skipped.slice(0,10));throw Error("Need 100 valid articles; found "+selected.length);}
