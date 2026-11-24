@@ -1,120 +1,146 @@
 # অনুসন্ধান newsroom
 
-A newsroom website and administration system deployed as three separate Dockploy services:
+Newsroom website and administration system. Production runs as **three separate Dokploy services**:
 
-- **Frontend** — Nginx serves the public website and admin panel.
-- **Backend** — Node.js/Express API, authentication, uploads and business logic.
-- **PostgreSQL** — persistent application database.
+1. **frontend** — Nginx serves the public website and admin panel.
+2. **backend** — Node.js 22 / Express API, authentication, media signing and database migrations.
+3. **postgres** — PostgreSQL 18 database with persistent storage.
 
-The frontend proxies requests under `/api` and `/healthz` to the backend over the private Docker network. The browser therefore uses one origin for the site and API, preserving the existing session-cookie and CSRF model. Article images are stored in S3-compatible object storage (Cloudflare R2 recommended); they are not stored in the container.
+The frontend proxies `/api` and `/healthz` to the backend. The browser uses one origin for the website and API, preserving the existing session-cookie and CSRF behavior. Article images are stored in Cloudflare R2 (S3-compatible), not in the application containers.
 
-## Deploy with Dockploy
+## Dokploy deployment — separate services
 
-Deploy the repository's **main** branch as a Docker Compose application, using the root `compose.yaml`. Do not create three independent Git deployments from the area-only branches: the Compose file builds all three services from the integrated main branch.
+Deploy from **`main`**. The `frontend`, `backend`, and `database` branches are historical area branches; they are not the production deployment targets. The integrated application and both production Dockerfiles are already in `main`. Do not merge the old area branches over `main`.
 
-### Services
+All three services must run on the same Dokploy server and share a Docker network. Dokploy's default `dokploy-network` is sufficient: services on it can resolve one another by service name. Keep the database off public domains/ports.
 
-| Dockploy service | Container | Purpose |
-|---|---|---|
-| `frontend` | Nginx | Public website, admin UI, reverse proxy |
-| `backend` | Node.js 22 | API, authentication, media signing, migrations |
-| `postgres` | PostgreSQL 18 | Persistent database |
+### 1. PostgreSQL service
 
-Expose only the frontend service publicly. Configure the Dockploy domain on `frontend` and set its container port to `80`. The frontend uses Compose `expose: 80` and has no host port binding. Keep `backend:3000` and `postgres:5432` private. The compose file creates a persistent `postgres_data` volume.
+Create a Dokploy **Database → PostgreSQL** service:
 
-### Environment variables
+- Service name / internal hostname: `postgres`
+- Version: PostgreSQL 18
+- Database: `onusondhan` (or your chosen name)
+- Username: `onusondhan` (or your chosen name)
+- Password: generate a strong password and save it securely
+- Persistent storage: enabled
+- Public exposure / domain: **disabled**
+- Internal port: `5432`
 
-Set these in the Dockploy Compose environment:
+Use the actual database name, username and password shown by Dokploy in the backend's `DATABASE_URL`. Do not publish port 5432 to the internet. Keep this service on `dokploy-network`.
+
+### 2. Backend application
+
+Create a separate Dokploy **Application** from this Git repository:
+
+- Repository: `ayaneklectik/onushandhan_prototype`
+- Branch: `main`
+- Build type: **Dockerfile**
+- Build context / root directory: repository root (`/`)
+- Dockerfile path: `Dockerfile.backend`
+- Internal application port: `3000`
+- Public domain: **none**
+- Network: `dokploy-network`
+- Service name / network hostname: `backend`
+
+Set these environment variables on the backend:
 
 ```dotenv
-POSTGRES_DB=onusondhan
-POSTGRES_USER=onusondhan
-POSTGRES_PASSWORD=use-a-strong-url-safe-password
-DATABASE_URL=postgres://onusondhan:use-a-strong-url-safe-password@postgres:5432/onusondhan
-SESSION_SECRET=generate-at-least-32-random-characters
+NODE_ENV=production
+PORT=3000
+TRUST_PROXY=1
+AUTO_MIGRATE=false
+DATABASE_URL=postgres://onusondhan:URL_ENCODED_PASSWORD@postgres:5432/onusondhan
+SESSION_SECRET=GENERATE_AT_LEAST_32_RANDOM_CHARACTERS
 MEDIA_ENDPOINT=https://YOUR_CLOUDFLARE_ACCOUNT_ID.r2.cloudflarestorage.com
 MEDIA_REGION=auto
-MEDIA_BUCKET=your-r2-bucket
-MEDIA_ACCESS_KEY_ID=your-r2-access-key-id
-MEDIA_SECRET_ACCESS_KEY=your-r2-secret-access-key
-MEDIA_PUBLIC_BASE_URL=https://your-public-media-domain
+MEDIA_BUCKET=YOUR_R2_BUCKET
+MEDIA_ACCESS_KEY_ID=YOUR_R2_ACCESS_KEY_ID
+MEDIA_SECRET_ACCESS_KEY=YOUR_R2_SECRET_ACCESS_KEY
+MEDIA_PUBLIC_BASE_URL=https://YOUR_PUBLIC_MEDIA_DOMAIN
 MEDIA_FORCE_PATH_STYLE=false
 MEDIA_MAX_IMAGE_BYTES=10485760
 ```
 
-Use a URL-safe PostgreSQL password in `DATABASE_URL` (or percent-encode reserved characters). Generate the session secret with `openssl rand -hex 32`. Keep all credentials in Dockploy environment settings, never in Git. The R2 public base URL must point to the public bucket/CDN hostname used to serve uploaded images. Configure R2 CORS to allow the deployed website origin to send browser `PUT` uploads with the required content-type header.
+Replace the example database credentials with the values from the Dokploy PostgreSQL service. URL-encode reserved characters in the database password before putting it in `DATABASE_URL`. Generate the session secret with `openssl rand -hex 32`. Never commit real credentials to Git.
 
-### Restore the Railway database before enabling migrations
+The frontend's Nginx config targets `http://backend:3000`; therefore the backend must be reachable on the shared network under the hostname `backend`. Keep `AUTO_MIGRATE=false` until the Railway database dump has been restored and checked.
 
-The checked-in Railway snapshot is a PostgreSQL 18.7 plain SQL dump. Restore it into a fresh PostgreSQL 18 database before enabling automatic migrations. Do not restore into a database that already contains application tables.
+### 3. Frontend application
 
-1. Deploy the Compose stack with `AUTO_MIGRATE=false` and the required database and R2 environment variables. The backend can start without running migrations; its health endpoint only checks database connectivity.
-2. Wait for PostgreSQL to become healthy. Restore the separately secured SQL dump into the `postgres` service using `psql` (for example, `docker compose exec -T postgres sh -c 'exec psql -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < /secure/path/railway_backup.sql`, from a trusted shell with the dump available). Do not commit or upload the dump to the public repository.
-3. Verify the restored tables, article counts, users, and the `schema_migrations` rows for migrations 001–008 before allowing public traffic.
-4. Set `AUTO_MIGRATE=true` and redeploy/restart the backend. The migration runner recognizes the historical `001_initial.sql` ledger name and will not replay the initial schema.
-5. Confirm `/healthz`, public pages, admin login, article images and R2 upload before announcing the site.
+Create another Dokploy **Application** from the same repository:
 
-Always take a backup before schema changes. Never restore the same dump over an already-populated database.
+- Repository: `ayaneklectik/onushandhan_prototype`
+- Branch: `main`
+- Build type: **Dockerfile**
+- Build context / root directory: repository root (`/`)
+- Dockerfile path: `Dockerfile.frontend`
+- Container port: `80`
+- Network: `dokploy-network`
+- Public domain: attach the website domain here
+- Service name: `frontend`
 
-### Startup and health checks
+The frontend has no application environment variables. It serves the static files and proxies API and health-check requests to `backend:3000`. Do not configure a separate public backend domain; the API is intentionally same-origin through Nginx.
 
-- PostgreSQL becomes healthy after `pg_isready` succeeds.
-- Backend waits for PostgreSQL, optionally applies unapplied SQL migrations when `AUTO_MIGRATE=true`, then starts Express on port `3000`.
-- Frontend waits for a healthy backend and serves on port `80`.
-- Dockploy should monitor frontend port `80`; its `/healthz` route is proxied to the backend and checks database connectivity.
+### 4. Restore the Railway PostgreSQL dump
 
-The backend migration runner tracks applied filenames in `schema_migrations`; existing migration files are not reapplied. Back up the database before deploying schema changes.
+The local backup `railway_backup.sql` is a PostgreSQL 18.7 **plain SQL** dump. Restore it into the fresh Dokploy PostgreSQL database before enabling migrations.
+
+1. Keep the frontend out of public traffic until the restore and checks are complete.
+2. Ensure the PostgreSQL service is healthy and the backend has `AUTO_MIGRATE=false`.
+3. Transfer the SQL dump securely from your Mac to the VPS, or use a secure database tunnel. Do not commit the dump or put it in a public directory.
+4. Import the plain SQL dump into the empty `onusondhan` database using `psql`. Do not use `pg_restore` for this plain SQL file.
+5. Verify the expected tables, article/user counts, and `schema_migrations` entries for migrations 001–008. Do not import the dump a second time into a populated database.
+6. Only after the restore is verified, change backend `AUTO_MIGRATE=true` and redeploy the backend. The migration runner recognizes the historical `001_initial.sql` ledger entry and will not replay the initial schema.
+
+Take a database backup before any later schema migration.
+
+### 5. Verify the deployment
+
+- Backend health check: `http://backend:3000/healthz` from the shared network; it checks PostgreSQL connectivity.
+- Frontend health check: `/healthz` on the public frontend domain; Nginx proxies it to the backend.
+- Confirm the homepage, article pages, admin login, and R2 image delivery.
+- Test an authenticated image upload and confirm the object appears in R2 and loads from `MEDIA_PUBLIC_BASE_URL`.
+- Only the frontend should have a public domain. Backend port 3000 and PostgreSQL port 5432 remain internal.
 
 ### First administrator
 
-After all services are healthy, run this one-off command in the backend container:
+The Railway snapshot should already contain the existing users. Do not create a new Super Admin unless the restored database has none. If a new initial Super Admin is genuinely needed, run this one-off command in the backend container:
 
 ```sh
 npm run admin:create-superadmin
 ```
 
-It prompts for the initial username, email and password. The password must be at least 12 characters. The command refuses to create a second initial Super Admin. The admin panel is available at `/admin` on the frontend domain.
+It prompts for a username, email and password. The password must be at least 12 characters. The script refuses to create another initial Super Admin if one already exists. The admin panel is available at `/admin` on the frontend domain.
 
-## Local deployment test
-
-Copy `.env.example` to `.env`, set the values above (including `DATABASE_URL=postgres://onusondhan:...@postgres:5432/onusondhan`), then run:
-
-```sh
-docker compose up --build -d
-docker compose ps
-docker compose logs -f backend
-```
-
-For a production Dockploy deployment, configure its public domain and TLS on the frontend service (container port `80`).
-
-## Development
+## Local checks
 
 Requirements: Node.js 20+, PostgreSQL 18 and an S3-compatible media bucket.
 
 ```sh
 npm ci
-npm run db:migrate
-npm run admin:create-superadmin
-npm start
+npm run check
+npm test
 ```
 
-Run checks with `npm run check` and tests with `npm test`.
+For local Docker testing only, the root `compose.yaml` starts all three components together. **Do not deploy that Compose stack in Dokploy for this production setup**; create the three independent services using the settings above.
 
-## Branch responsibilities
+## Repository layout
 
-- `main`: integrated deployable application and Compose orchestration.
-- `frontend`: static public/admin UI, Nginx configuration and frontend image.
-- `backend`: API, backend runtime image and operational scripts.
-- `database`: SQL migrations and migration runner.
-
-Make area-specific changes on their respective branches, then integrate them into `main` before deploying the Compose stack. The database itself is a runtime PostgreSQL service; the `database` branch contains schema and migration code, not a second application container.
+- `main`: integrated application and production deployment files.
+- `Dockerfile.frontend`: Nginx frontend image.
+- `Dockerfile.backend`: Node.js API image.
+- `nginx/default.conf`: same-origin API and health-check proxy.
+- `server/`: API, authentication, database and media code.
+- `migrations/`: ordered SQL migrations and migration runner.
+- `frontend`, `backend`, `database`: historical area branches, not deployment branches.
 
 ## Security and operations
 
-- Only the frontend should have a public domain/port. Do not publish backend or PostgreSQL ports.
-- Keep PostgreSQL data in the named persistent volume and schedule backups.
-- Keep R2 and database credentials private. Rotate any credentials that have been exposed.
-- Set `TRUST_PROXY=1` because Express is behind the frontend reverse proxy.
+- Never expose PostgreSQL or the backend directly to the public internet.
+- Keep database credentials, session secret and R2 credentials in Dokploy environment settings.
+- Keep PostgreSQL data on persistent storage and schedule backups.
+- Use `TRUST_PROXY=1` behind Dokploy's reverse proxy.
 - Set `MEDIA_FORCE_PATH_STYLE=false` for Cloudflare R2.
-- The app serves all API requests from the same public origin; do not configure browser CORS or point frontend JavaScript directly at an internal backend hostname.
-- The video-only category contains YouTube video links; uploaded article images are stored in R2.
+- Configure the R2 bucket CORS policy to allow the frontend origin to perform browser `PUT` uploads with the required content-type header.
+- Do not configure browser JavaScript to call the backend's private hostname; all browser API calls use the frontend's same-origin `/api` path.
