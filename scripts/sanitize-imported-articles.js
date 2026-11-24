@@ -61,6 +61,21 @@ async function main() {
     [row.title, row.headline, row.summary, row.body, row.image_alt, row.image_caption, row.image_credit, row.attribution]
       .some((value) => /24\s*ghonta|24ghonta|২৪\s*ঘণ্টা\s*টিভি|২৪\s*ঘন্টা\s*টিভি/i.test(String(value || "")))
   );
+  const execute = process.argv.includes("--execute");
+  console.log("Cleanup preview:", {
+    articles: targetArticles.length,
+    mediaObjectsToRename: assetsResult.rowCount,
+    sourceTrackingRows: trackedResult.rowCount,
+    mode: execute ? "EXECUTE" : "DRY RUN",
+  });
+  for (const article of targetArticles.slice(0, 12)) {
+    console.log("Article:", article.slug, "->", slugify(article.title) || `news-${article.slug?.match(/(\\d+)$/)?.[1] || article.id.slice(0, 8)}`);
+  }
+  if (!execute) {
+    console.log("No changes made. Review this preview, then run with -- --execute.");
+    return;
+  }
+
   const replacements = [];
   for (const asset of assetsResult.rows) {
     const extension = asset.object_key.match(/\.[a-z0-9]{2,5}$/i)?.[0] || "";
