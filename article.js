@@ -20,7 +20,12 @@
 
   function renderBody(body) {
     const fragment = document.createDocumentFragment();
-    const parsed = new DOMParser().parseFromString(String(body || ""), "text/html");
+    let source = String(body || "");
+    let parsed = new DOMParser().parseFromString(source, "text/html");
+    if (/&lt;\/?(?:span|p|strong|b|em|i|u|h[2-3]|ul|ol|li|blockquote|a|br)\b/i.test(source)) {
+      source = parsed.body.textContent;
+      parsed = new DOMParser().parseFromString(source, "text/html");
+    }
     const allowed = new Set(["P", "BR", "H2", "H3", "STRONG", "B", "EM", "I", "U", "UL", "OL", "LI", "BLOCKQUOTE", "A"]);
     const copySafe = (source, target) => {
       for (const child of source.childNodes) {
@@ -46,7 +51,7 @@
         target.append(element);
       }
     };
-    if (/<\/?(p|h2|h3|strong|b|em|i|u|ul|ol|li|blockquote|a|br)\b/i.test(body || "")) {
+    if (/<\/?(p|h2|h3|strong|b|em|i|u|ul|ol|li|blockquote|a|br|span)\b/i.test(source)) {
       copySafe(parsed.body, fragment);
     } else {
       String(body || "").split(/\n{2,}/).forEach((paragraph) => {

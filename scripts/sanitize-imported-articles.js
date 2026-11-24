@@ -36,7 +36,8 @@ function clean(value) {
     .replace(/<a\b[^>]*href=["'][^"']*(?:24ghonta|24-ghonta)[^"']*["'][^>]*>([\s\S]*?)<\/a>/gi, "$1")
     .replace(/(?:সূত্র|সৌজন্যে|প্রকাশক|প্রকাশনা)\s*[:：-]?\s*(?:২৪\s*ঘণ্টা(?:\s*টিভি)?|২৪\s*ঘন্টা(?:\s*টিভি)?|24\s*ghonta(?:\s*tv)?|24ghontatv(?:\.com)?)/giu, "")
     .replace(/https?:\/\/(?:www\.)?24ghontatv\.com[^\s"'<>)]*/gi, "")
-    .replace(/(?:24[\s-]*ghonta(?:[\s-]*tv)?|২৪\s*ঘণ্টা\s*টিভি|২৪\s*ঘন্টা\s*টিভি|২৪ঘণ্টা|২৪ঘন্টা)/giu, "")
+    .replace(/(?:24[\s._-]*ghonta(?:[\s._-]*tv)?|২৪[\s\u200b]*ঘণ্টা(?:[\s\u200b]*টিভি)?|২৪[\s\u200b]*ঘন্টা(?:[\s\u200b]*টিভি)?|২৪ঘণ্টা|২৪ঘন্টা)/giu, "")
+    .replace(/&(?:#x?[0-9a-f]+|amp|lt|gt|quot);/gi, " ")
     .replace(/[ \t]{2,}/g, " ").replace(/\s+([,।;:])/g, "$1").trim();
 }
 
@@ -57,9 +58,9 @@ async function main() {
     "SELECT id, slug, title, headline, summary, body, image_alt, image_caption, image_credit, attribution, image_key FROM articles ORDER BY created_at",
   );
   const targetArticles = allArticleRows.rows.filter((row) =>
-    trackedIds.has(row.id) || /24ghonta|24-ghonta/i.test(row.slug || "") ||
+    trackedIds.has(row.id) || /24\s*[-_.]*\s*ghonta|২৪\s*ঘণ্টা|২৪\s*ঘন্টা/i.test(row.slug || "") ||
     [row.title, row.headline, row.summary, row.body, row.image_alt, row.image_caption, row.image_credit, row.attribution]
-      .some((value) => /24\s*ghonta|24ghonta|২৪\s*ঘণ্টা\s*টিভি|২৪\s*ঘন্টা\s*টিভি/i.test(String(value || "")))
+      .some((value) => /24\s*[-_.]*\s*ghonta|২৪\s*ঘণ্টা|২৪\s*ঘন্টা|২৪ঘণ্টা|২৪ঘন্টা/i.test(String(value || "")))
   );
   const execute = process.argv.includes("--execute");
   console.log("Cleanup preview:", {

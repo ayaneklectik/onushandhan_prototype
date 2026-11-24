@@ -419,7 +419,7 @@
               <button type="button" data-format="link">লিংক</button>
               <button type="button" data-format="remove">ফরম্যাট মুছুন</button>
             </div>
-            <div id="article-body-editor" class="article-rich-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="এখানে প্রতিবেদন লিখুন…">${article?.body || ""}</div>
+            <div id="article-body-editor" class="article-rich-editor" contenteditable="true" role="textbox" aria-multiline="true" data-placeholder="এখানে প্রতিবেদন লিখুন…">${(() => { const raw = String(article?.body || ""); const parsed = new DOMParser().parseFromString(raw, "text/html"); return /&lt;\/?(?:span|p|strong|b|em|i|u|h[2-3]|ul|ol|li|blockquote)\b/i.test(raw) ? parsed.body.textContent : raw; })()}</div>
             <textarea name="body" hidden maxlength="100000">${escapeHtml(article?.body || "")}</textarea>
           </label>
         </div>
@@ -483,7 +483,7 @@
         title: formData.get("title"),
         headline: formData.get("headline"),
         summary: formData.get("summary"),
-        body: form.querySelector("#article-body-editor").innerHTML,
+        body: (() => { const html = richEditor.innerHTML; const parsed = new DOMParser().parseFromString(html, "text/html"); return /&lt;\/?(?:span|p|strong|b|em|i|u|h[2-3]|ul|ol|li|blockquote)\b/i.test(html) ? parsed.body.textContent : html; })(),
         attribution: formData.get("attribution"),
         imageCaption: formData.get("imageCaption"),
         imageCredit: formData.get("imageCredit"),
