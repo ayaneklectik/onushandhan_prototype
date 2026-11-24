@@ -13,7 +13,8 @@
     "seed:test-articles": "node scripts/seed-test-articles.js",
     "seed:remove-test-articles": "node scripts/remove-test-articles.js",
     "import:24ghonta": "node scripts/import-24ghonta.js",
-    "import:24ghonta:remove": "node scripts/remove-24ghonta-import.js"
+    "import:24ghonta:remove": "node scripts/remove-24ghonta-import.js",
+    "articles:sanitize-imports": "node scripts/sanitize-imported-articles.js"
   },
   "engines": {
     "node": ">=20"
